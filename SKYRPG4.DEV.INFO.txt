@@ -1,0 +1,27 @@
+This is a development log for the in-development SkyRPG4. I'll include a changelog during development of all implemented features.
+There are two branches being used for this development:
+	1.	A development branch
+		This version contains features that are in-development, but may or may not be finished.
+	2.	A stable branch
+		This version contains no in-development features.
+		
+	The stable branch will be the version uploaded to GitHub; When a development branch is upgraded to a stable branch, it will be uploaded to the
+	repository, and then a new development branch will be made from it, to continue implementing featuers.
+	
+What does this mean for server operators and other developers?
+	1.	There won't be unused or commented code in the stable branch.
+	2.	Comments explaining what each functions do will be provided, but there will not be line-by-line commentary.
+	
+What is the aim of SkyRPG4?
+	1.	In the previous iteration of SkyRPG [ dubbed Ready Up - RPG ] that I developed, it required several major functionalities from my ReadyUp
+		plugin in order to operate, such as parsing files and determing certain points, such as when the round was live, ended, or when it was
+		safe to load player data.
+		
+		In SkyRPG4, the Ready Up dependency has been removed. The needed functions will be properly integrated directly into SkyRPG4. It will depend
+		on no other plugins, making it more readily available to a larger server-base.
+	2.	More Flexibility.
+		In this version, I'm developing even more flexibility for server operators, building upon the foundation I developed in the previous iteration.
+		This means more options for how to display and setup data.
+		
+		
+
