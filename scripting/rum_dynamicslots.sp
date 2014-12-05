@@ -169,7 +169,7 @@ stock GetSpectatorCount() {
 
 stock bool:IsReserve(client) {
 
-	if (HasCommandAccess(client, "z") || HasCommandAccess(client, "a")) return true;
+	if (HasCommandAccessEx(client, "z") || HasCommandAccessEx(client, "a")) return true;
 	return false;
 }
 
