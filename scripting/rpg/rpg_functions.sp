@@ -2382,7 +2382,7 @@ stock Float:TeamworkProximityMultiplier(client, bool:b_IsExperience) {
 stock LegacyItemRoll(victim, attacker, bool:b_IsCommon) {
 
 	//DamageAward[i][client]
-	if (HumanPlayersIngame() < StringToInt(GetConfigValue("required humans for item drops?"))) return;
+	if (HumanPlayersInGame() < StringToInt(GetConfigValue("required humans for item drops?"))) return;
 	new clientid	= attacker;		// we set the default client to the attacker, since if it's a common killed, we don't determine a specific client from damage.
 	new bestroll	= 0;
 	new currroll	= 0;
@@ -2455,7 +2455,7 @@ stock LegacyItemRoll(victim, attacker, bool:b_IsCommon) {
 					UnlockTalent(clientid, itemname, false, true);		// arg3 is bIsEndOfMapRoll, which defaults to false, arg4 is bIsLegacy, which defaults to false.
 					for (new i = 1; i <= MaxClients; i++) {
 
-						if (isClientInGame(i) && !IsFakeClient(i)) {
+						if (IsClientInGame(i) && !IsFakeClient(i)) {
 
 							Format(translationname, sizeof(translationname), "%T", itemname, i);
 							PrintToChat(i, "%T", "Locked Talent Award legacy", i, blue, Name, white, orange, itemname, white, orange, rollvalue, white);

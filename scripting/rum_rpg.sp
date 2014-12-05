@@ -1,4 +1,4 @@
-/**
+ /**
  * =============================================================================
  * Ready Up - RPG (C)2014 Michael "Skye" Toth
  * =============================================================================
@@ -1533,7 +1533,7 @@ public ReadyUp_LoadFromConfigEx(Handle:key, Handle:value, Handle:section, String
 		RegConsoleCmd(GetConfigValue("give level command?"), CMD_GiveLevel);
 		RegConsoleCmd(GetConfigValue("chat tag naming command?"), CMD_ChatTag);
 
-		if (StringToint(GetConfigValue("legacy item drops?")) >= 1) b_IsLegacyMode = true;
+		if (StringToInt(GetConfigValue("legacy item drops?")) >= 1) b_IsLegacyMode = true;
 		else b_IsLegacyMode = false;
 	}
 
