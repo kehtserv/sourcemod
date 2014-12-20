@@ -13,7 +13,7 @@ stock FindValidPlayers()
 	{
 		if (IsLegitimateClient(i) && !IsFakeClient(i)) {
 
-			if (!HasCommandAccess(i, "a")) IsNotHere[i] = false;
+			if (!HasCommandAccessEx(i, "a")) IsNotHere[i] = false;
 			if (IsNotHere[i])
 			{
 				bAssigned[i] = true;

@@ -962,7 +962,7 @@ stock GiveMaximumHealth(client)
 
 stock GetMaximumHealth(client)
 {
-	if (IsLegitimateClientAlive(client)) return GetEntProp(client, Prop_Send, "m_iMaxHealth");
+	if (IsLegitimateClient(client)) return GetEntProp(client, Prop_Send, "m_iMaxHealth");
 	else return 0;
 }
 
