@@ -1,19 +1,20 @@
 ﻿"Phrases"
 {
-	"close menu"
+	"Change Team Spectator"
 	{
-		"en"			"0. Close Menu"
+		"#format"	"{1:s},{2:s},{3:s},{4:s}"
+		"en"		"{1}{2} {3}has switched their team to {4}Spectator"
 	}
-	"spectator"
-	{
-		"en"			"Join Spectators"
 	}
-	"survivor"
+	"Change Team Spectator"
 	{
-		"en"			"Join Survivors"
+		"#format"	"{1:s},{2:s},{3:s},{4:s}"
+		"en"		"{1}{2} {3}has switched their team to {4}Survivor"
 	}
-	"infected"
+	}
+	"Change Team Spectator"
 	{
-		"en"			"Join Infected"
+		"#format"	"{1:s},{2:s},{3:s},{4:s}"
+		"en"		"{1}{2} {3}has switched their team to {4}Infected"
 	}
 }
