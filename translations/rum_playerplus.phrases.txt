@@ -6,13 +6,13 @@
 		"en"		"{1}{2} {3}has switched their team to {4}Spectator"
 	}
 	}
-	"Change Team Spectator"
+	"Change Team Survivor"
 	{
 		"#format"	"{1:s},{2:s},{3:s},{4:s}"
 		"en"		"{1}{2} {3}has switched their team to {4}Survivor"
 	}
 	}
-	"Change Team Spectator"
+	"Change Team Infected"
 	{
 		"#format"	"{1:s},{2:s},{3:s},{4:s}"
 		"en"		"{1}{2} {3}has switched their team to {4}Infected"
