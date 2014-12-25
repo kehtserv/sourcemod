@@ -68,7 +68,7 @@ public Action:Cmd_JoinTeam(client, String:command[], argc) {
 	if ((StrEqual(a_temp, "Survivor") || StringToInt(a_temp) == TEAM_SURVIVOR) && GetClientTeam(client) != TEAM_SURVIVOR) ChangeTeamSurvivor(client);
 	else if (ReadyUp_GetGameMode() == 2 && ((StrEqual(a_temp, "Infected") || StringToInt(a_temp) == TEAM_INFECTED) && GetClientTeam(client) != TEAM_INFECTED)) ChangeClientTeam(client, TEAM_INFECTED);
 	else if (StrEqual(a_temp, "Spectator") || StringToInt(a_temp) == TEAM_SPECTATOR) ChangeClientTeam(client, TEAM_SPECTATOR);
-	if (StringToInt(a_temp) != TEAM_SURVIVOR) KickSurvivorBots();
+	if (StringToInt(a_temp) != TEAM_SURVIVOR) CreateTimer(0.1, Timer_KickSurvivorBots, _, TIMER_FLAG_NO_MAPCHANGE);//KickSurvivorBots();
 
 	return Plugin_Handled;
 }
@@ -130,18 +130,31 @@ public GiveMedKits() {
 
 public KickSurvivorBots() {
 
-	if (TotalHumanCount() > 0 && (TotalSurvivorCount() < 4 || TotalHumanSurvivorCount() < 4)) {
+	if (TotalHumanCountNotSpectator() > 0) {
 
-		if (TotalSurvivorCount() < 4) {
+		if (TotalHumanCount() > 0 && (TotalSurvivorCount() < 4 || TotalHumanSurvivorCount() < 4)) {
 
-			CreateSurvivorBot();
+			if (TotalSurvivorCount() < 4) {
+
+				CreateSurvivorBot();
+			}
+			return;
 		}
-		return;
 	}
 	for (new i = 1; i <= MaxClients; i++) {
 
 		if (IsClientBot(i) && GetClientTeam(i) == TEAM_SURVIVOR) KickClient(i);
 	}
+}
+
+public TotalHumanCountNotSpectator() {
+
+	new Count = 0;
+	for (new i = 1; i <= MaxClients; i++) {
+
+		if (IsClientInGame(i) && !IsFakeClient(i) && GetClientTeam(i) != TEAM_SPECTATOR) Count++;
+	}
+	return Count;
 }
 
 public TotalHumanSurvivorCount() {
