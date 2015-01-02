@@ -1,14 +1,78 @@
 New updates will be added to this log. Version updates prior to v2.0.1 will not be listed, as they aren't relevant.
+v3.0.2 (In Development) <- Features Not Yet Implemented
++	Configurable game modes? re: gamemodes.cfg?
+	-	Something like...
+	"vip mode"
+	{
+		"required votes?"			"0.3"		// 30% must vote for it to trigger
+		"select voter only?"		"1"			// Only a player who voted in favor can be selected.
+		"player flag?"				"v"			// The flag assigned to the player; players can have multiple flags assigned. v -> vip.
+		"remove flag on death?"		"1"			// The player flag will be removed if the player dies.
+		"award requirement?"		"r"			// Requirement for award to be given out. r -> survive the entire round with the flag.
+		"teams allowed?"			"2"			// Which team(s) are allowed to vote for this game mode? 2 -> survivor
+		"team award?"				"1"			// Is the award given to the team if the gamemode is successful, or to the player? 1 -> team (includes player)
+		"award type?"				"x"			// What type of award is given out? x -> experience.
+		"award value?"				"0.3"		// Use rounded (1.0, 2.0, etc.) values for non-experience award types. if experience, value * gamemode player round earned total, rounded.
+		"weapons allowed?"			"pistol"	// Which weapons can the player using the gamemode use? pistol -> weapons containing pistol, only. Magnums/Pistols. "ALL" ignores this key.
+		"EOM"						"EOM"
+	}
+	(The above is a sample config.)
++	Weapon Level 2.0
 
-v2.1 (In Development)
-
-+	Runes!
-	-	Runes add a new, comprehensive system to RPG, allowing players to wield powerful artifacts.
-		+	A player may hold only one rune at a time.
-		+	Picking up a new, un-identified rune requires dropping the rune you are carrying, if you are carrying a rune.
-		+	Picking up a rune resets your Rune Level to 0.
-		+	Players spend experience to upgrade Rune Level, in the same way they spend it to upgrade talents and level up.
-
+v3.0.1 (January 2, 2015) <- Current Release Version
++	Config File restructuring
+	-	Talent Config files have been restructured.
+		survivormenu.cfg and infectedmenu.cfg have been merged into a single file: talentmenu.cfg. Using the old config names will no longer work.
+		The key "activator class required?" is used to determine which team "owns" each talent, if any; it's possible for both teams to have access to
+		a talent, if the value of that key contains values from both teams, such as "01" which would allow both survivors and smokers access.
+	-	Main Menu Config has been expanded into individual sections.
+		Sections have been added to mainmenu.cfg to allow server operators to dictate under which circumstances each menu option is available.
+		Circumstances include things like player team, admin flags, server game types.
++	Chance Multiplier for End of Map Rolls
+	-	Added new keyvalue to talentmenu.cfg and store.cfg, allowing server operators to add a modifiable weight to the otherwise static roll variable
+		when calculating end of map rolls for players.
+		+	"weight multiplier?"
+			The value can range from 0.0 to 2.0. The value is hard-coded to 2.0 if a value greater is found in the config.
+			1.0 is the default value; a value below 1.0 means a lower weight; less likelihood, with 0.0 having no chance in the item being awarded.
+			2.0 doubles the chance that the item will successfully roll and as thus, be rewarded.
+		+	Weighted rolls let the server operators decide which items they would like to see awarded more often, without having to reconfigure each
+		available roll item on an individual level.
++	Talent Creation / Customization Changes
+	-	Survivor Class-Specific talent support.
+		+	Added new keyvalue to talentmenu.cfg allowing server operators to create talents that require a specific survivor class to activate.
+			-	"survivor required?"
+				The value MUST match one of the eight survivor models. If omitted or set to "-1" it will allow any survivor.
+				This keyvalue is checked if the survivor is either a victim or attacker.
+	-	Cross-Team talent support.
+		+	Talents can now be used by players on both teams, depending on a specific setting.
+			I have, by default, set talents like this to be placed in "part of menu named?" "Cross-Team Talents"
+			-	"activator class required?"
+				0 - Survivor, 1 -> 6 + 8 - Infected values. Please see the talentmenu.cfg for a complete listing of which class is assigned to which integer.
+				If the value of this key is "01" for instance, Survivors AND Smokers can use the talent. Pretty cool, huh?
++	Code Restructuring / Rewrite
+	-	A large amount of code has been scrapped, restructured, and/or rewritten.
+		+	Optimized Menus
+			Menus have been optimized. I've made it easier to create embedded sub-menu's, using less code. /yay
+		+	Optimized General Functionality
+			Rewritten a few functions that could potentially be confusing to developers, while optimizing the actual amount of existing code.
++	Global Config Variables (config.cfg) Added
+	-	"chat settings flags?"
+		Custom allowed flags can now be set in the instance in which chat settings are not available for all players.
+		Previously this was hard-coded to the a or z flags only, but now any flags can be set. The default is "az"
+		+	This variable is ignored if "all players chat settings?" is set to 1.
++	Additional Store Configurations
+	-	Server operators have the option to add additional options to the store.
+		+	Bulk Experience / Experience Blocks
+			Server operators can add experience blocks, whether a specified amount, or a random value within a specified range.
+			-	"amount min?" & "amount max?"
+				This store option is accompanied by two new values; these numbers can be between 0.01 (1%) and 1.0 (100%)
+				The percentage values dictate the amount (multiplied against a players maximum experience container) of experience
+				a player will receive when picking up or purchasing the item.
+				For a static value, simply set both numbers equal, or set "amount max?" to 0.0
+		+	Backpack Items
+			Server operators, should they choose, can allow players to buy a RANDOM backpack drop, which will spawn on them.
+			These items are free-for-all; any survivor can grab them. Buy them for yourself, or buy them for friends!
+		
 v2.0.4.1 (November 26, 2014)
 +	Added complete customization for user flags.
 	-	This adds several new variables to /CONFIGS/READYUP/RPG/CONFIG.CFG

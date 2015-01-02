@@ -30,16 +30,15 @@
 #define TEAM_INFECTED		3
 #define MAX_ENTITIES		2048
 #define MAX_CHAT_LENGTH		1024
-#define PLUGIN_VERSION		"2.0.4.2"
-#define PLUGIN_CONTACT		"steamcommunity.com/id/palevixen"
+#define PLUGIN_VERSION		"3.0.1"
+#define PLUGIN_CONTACT		"forums.alliedmods.net/showthread.php?p=2238303"
 #define PLUGIN_NAME			"SkyRPG"
 #define PLUGIN_DESCRIPTION	"A modular RPG plugin that reads user-generated config files"
 #define PLUGIN_URL			"github.com/exskye"
 //#define CONFIG_MAIN					"rpg/config.cfg"
 #define CONFIG_EVENTS				"rpg/events.cfg"
 #define CONFIG_MAINMENU				"rpg/mainmenu.cfg"
-#define CONFIG_MENUSURVIVOR			"rpg/survivormenu.cfg"
-#define CONFIG_MENUINFECTED			"rpg/infectedmenu.cfg"
+#define CONFIG_MENUTALENTS			"rpg/talentmenu.cfg"
 #define CONFIG_POINTS				"rpg/points.cfg"
 #define CONFIG_MAPRECORDS			"rpg/maprecords.cfg"
 #define CONFIG_STORE				"rpg/store.cfg"
@@ -57,6 +56,7 @@
 #define ZOMBIECLASS_CHARGER											6
 #define ZOMBIECLASS_TANK											8
 #define ZOMBIECLASS_SURVIVOR										0
+
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
@@ -169,9 +169,7 @@ new String:s_rup[32];
 new bool:b_ClearedAdt;
 new Handle:MainKeys;
 new Handle:MainValues;
-new Handle:a_Menu_Talents_Survivor;
-new Handle:a_Menu_Talents_Infected;
-new Handle:a_Menu_Talents_Passives;
+new Handle:a_Menu_Talents;
 new Handle:a_Menu_Main;
 new Handle:a_Events;
 new Handle:a_Points;
@@ -344,6 +342,10 @@ public OnPluginStart()
 {
 	CreateConVar("rum_rpg", PLUGIN_VERSION, "version header", CVAR_SHOW);
 	SetConVarString(FindConVar("rum_rpg"), PLUGIN_VERSION);
+	CreateConVar("rum_rpg_contact", PLUGIN_CONTACT, "SkyRPG contact", CVAR_SHOW);
+	SetConVarString(FindConVar("rum_rpg_contact"), PLUGIN_CONTACT);
+	CreateConVar("rum_rpg_url", PLUGIN_URL, "SkyRPG url", CVAR_SHOW);
+	SetConVarString(FindConVar("rum_rpg_url"), PLUGIN_URL);
 
 	g_Steamgroup = FindConVar("sv_steamgroup");
 	SetConVarFlags(g_Steamgroup, GetConVarFlags(g_Steamgroup) & ~FCVAR_NOTIFY);
@@ -479,9 +481,7 @@ public OnMapStart() {
 
 		if (MainKeys == INVALID_HANDLE || !b_FirstLoad) MainKeys										= CreateArray(16);
 		if (MainValues == INVALID_HANDLE || !b_FirstLoad) MainValues										= CreateArray(16);
-		if (a_Menu_Talents_Survivor == INVALID_HANDLE || !b_FirstLoad) a_Menu_Talents_Survivor							= CreateArray(3);
-		if (a_Menu_Talents_Infected == INVALID_HANDLE || !b_FirstLoad) a_Menu_Talents_Infected							= CreateArray(3);
-		if (a_Menu_Talents_Passives == INVALID_HANDLE || !b_FirstLoad) a_Menu_Talents_Passives							= CreateArray(3);
+		if (a_Menu_Talents == INVALID_HANDLE || !b_FirstLoad) a_Menu_Talents							= CreateArray(3);
 		if (a_Menu_Main == INVALID_HANDLE || !b_FirstLoad) a_Menu_Main										= CreateArray(3);
 		if (a_Events == INVALID_HANDLE || !b_FirstLoad) a_Events										= CreateArray(3);
 		if (a_Points == INVALID_HANDLE || !b_FirstLoad) a_Points										= CreateArray(3);
@@ -595,20 +595,10 @@ public OnMapEnd() {
 			CloseHandle(Handle:MainValues);
 			MainValues = INVALID_HANDLE;
 		}
-		if (a_Menu_Talents_Survivor != INVALID_HANDLE) {
+		if (a_Menu_Talents != INVALID_HANDLE) {
 
-			CloseHandle(Handle:a_Menu_Talents_Survivor);
-			a_Menu_Talents_Survivor = INVALID_HANDLE;
-		}
-		if (a_Menu_Talents_Infected != INVALID_HANDLE) {
-
-			CloseHandle(Handle:a_Menu_Talents_Infected);
-			a_Menu_Talents_Infected = INVALID_HANDLE;
-		}
-		if (a_Menu_Talents_Passives != INVALID_HANDLE) {
-
-			CloseHandle(Handle:a_Menu_Talents_Passives);
-			a_Menu_Talents_Passives = INVALID_HANDLE;
+			CloseHandle(Handle:a_Menu_Talents);
+			a_Menu_Talents = INVALID_HANDLE;
 		}
 		if (a_Menu_Main != INVALID_HANDLE) {
 
@@ -996,8 +986,7 @@ public Action:Timer_ExecuteConfig(Handle:timer) {
 
 		ReadyUp_ParseConfig(CONFIG_MAIN);
 		ReadyUp_ParseConfig(CONFIG_EVENTS);
-		ReadyUp_ParseConfig(CONFIG_MENUSURVIVOR);
-		ReadyUp_ParseConfig(CONFIG_MENUINFECTED);
+		ReadyUp_ParseConfig(CONFIG_MENUTALENTS);
 		ReadyUp_ParseConfig(CONFIG_POINTS);
 		ReadyUp_ParseConfig(CONFIG_STORE);
 		ReadyUp_ParseConfig(CONFIG_TRAILS);
@@ -1389,8 +1378,7 @@ public ReadyUp_ParseConfigFailed(String:config[], String:error[]) {
 
 	if (StrEqual(config, CONFIG_MAIN) ||
 		StrEqual(config, CONFIG_EVENTS) ||
-		StrEqual(config, CONFIG_MENUSURVIVOR) ||
-		StrEqual(config, CONFIG_MENUINFECTED) ||
+		StrEqual(config, CONFIG_MENUTALENTS) ||
 		StrEqual(config, CONFIG_MAINMENU) ||
 		StrEqual(config, CONFIG_POINTS) ||
 		StrEqual(config, CONFIG_STORE) ||
@@ -1407,8 +1395,7 @@ public ReadyUp_LoadFromConfigEx(Handle:key, Handle:value, Handle:section, String
 
 	if (!StrEqual(configname, CONFIG_MAIN) &&
 		!StrEqual(configname, CONFIG_EVENTS) &&
-		!StrEqual(configname, CONFIG_MENUSURVIVOR) &&
-		!StrEqual(configname, CONFIG_MENUINFECTED) &&
+		!StrEqual(configname, CONFIG_MENUTALENTS) &&
 		!StrEqual(configname, CONFIG_MAINMENU) &&
 		!StrEqual(configname, CONFIG_POINTS) &&
 		!StrEqual(configname, CONFIG_STORE) &&
@@ -1428,8 +1415,7 @@ public ReadyUp_LoadFromConfigEx(Handle:key, Handle:value, Handle:section, String
 
 	if (keyCount > 0) {
 
-		if (StrEqual(configname, CONFIG_MENUSURVIVOR)) ResizeArray(a_Menu_Talents_Survivor, keyCount);
-		else if (StrEqual(configname, CONFIG_MENUINFECTED)) ResizeArray(a_Menu_Talents_Infected, keyCount);
+		if (StrEqual(configname, CONFIG_MENUTALENTS)) ResizeArray(a_Menu_Talents, keyCount);
 		else if (StrEqual(configname, CONFIG_MAINMENU)) ResizeArray(a_Menu_Main, keyCount);
 		else if (StrEqual(configname, CONFIG_EVENTS)) ResizeArray(a_Events, keyCount);
 		else if (StrEqual(configname, CONFIG_POINTS)) ResizeArray(a_Points, keyCount);
@@ -1461,8 +1447,7 @@ public ReadyUp_LoadFromConfigEx(Handle:key, Handle:value, Handle:section, String
 			GetArrayString(Handle:section, i, s_section, sizeof(s_section));
 			PushArrayString(TalentSection, s_section);
 
-			if (StrEqual(configname, CONFIG_MENUSURVIVOR)) SetConfigArrays(configname, a_Menu_Talents_Survivor, TalentKeys, TalentValues, TalentSection, GetArraySize(a_Menu_Talents_Survivor), lastPosition - counter);
-			else if (StrEqual(configname, CONFIG_MENUINFECTED)) SetConfigArrays(configname, a_Menu_Talents_Infected, TalentKeys, TalentValues, TalentSection, GetArraySize(a_Menu_Talents_Infected), lastPosition - counter);
+			if (StrEqual(configname, CONFIG_MENUTALENTS)) SetConfigArrays(configname, a_Menu_Talents, TalentKeys, TalentValues, TalentSection, GetArraySize(a_Menu_Talents), lastPosition - counter);
 			else if (StrEqual(configname, CONFIG_MAINMENU)) SetConfigArrays(configname, a_Menu_Main, TalentKeys, TalentValues, TalentSection, GetArraySize(a_Menu_Main), lastPosition - counter);
 			else if (StrEqual(configname, CONFIG_EVENTS)) SetConfigArrays(configname, a_Events, TalentKeys, TalentValues, TalentSection, GetArraySize(a_Events), lastPosition - counter);
 			else if (StrEqual(configname, CONFIG_POINTS)) SetConfigArrays(configname, a_Points, TalentKeys, TalentValues, TalentSection, GetArraySize(a_Points), lastPosition - counter);
@@ -1604,7 +1589,7 @@ stock SetConfigArrays(String:Config[], Handle:Main, Handle:Keys, Handle:Values, 
 
 	GetArrayString(Handle:Section, size, text, sizeof(text));
 	PushArrayString(TalentSection, text);
-	if (StrEqual(Config, CONFIG_MENUSURVIVOR) || StrEqual(Config, CONFIG_MENUINFECTED)) PushArrayString(a_Database_Talents, text);
+	if (StrEqual(Config, CONFIG_MENUTALENTS)) PushArrayString(a_Database_Talents, text);
 
 	ResizeArray(Main, size + 1);
 	SetArrayCell(Main, size, TalentKey, 0);

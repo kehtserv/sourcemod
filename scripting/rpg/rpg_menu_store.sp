@@ -18,8 +18,11 @@ BuildStoreMenu(client) {
 	new Hours						=	0;
 	new Minutes						=	0;
 
-	decl String:key[64];
-	decl String:value[64];
+	new Amount						=	0;
+	new Float:AmountMin				=	0.0;
+	new Float:AmountMax				=	0.0;
+
+
 	decl String:durationtext[512];
 
 	new size						=	GetArraySize(a_Store);
@@ -34,17 +37,12 @@ BuildStoreMenu(client) {
 
 		Hours						=	0;
 		Minutes						=	0;
-
-		new size2					=	GetArraySize(MenuKeys[client]);
-		for (new ii = 0; ii < size2; ii++) {
-
-			GetArrayString(Handle:MenuKeys[client], ii, key, sizeof(key));
-			GetArrayString(Handle:MenuValues[client], ii, value, sizeof(value));
-
-			if (StrEqual(key, "store cost?")) StoreCost				=	StringToInt(value);
-			else if (StrEqual(key, "duration?")) Duration			=	StringToInt(value);
-			else if (StrEqual(key, "item strength?")) ItemStrength	=	StringToFloat(value);
-		}
+		StoreCost		= StringToInt(GetKeyValue(MenuKeys[client], MenuValues[client], "store cost?"));
+		Duration		= StringToInt(GetKeyValue(MenuKeys[client], MenuValues[client], "duration?"));
+		ItemStrength	= StringToFloat(GetKeyValue(MenuKeys[client], MenuValues[client], "item strength?"));
+		Amount			= StringToInt(GetKeyValue(MenuKeys[client], MenuValues[client], "amount?"));
+		AmountMin		= StringToFloat(GetKeyValue(MenuKeys[client], MenuValues[client], "amount min?"));
+		AmountMax		= StringToFloat(GetKeyValue(MenuKeys[client], MenuValues[client], "amount max?"));
 
 		if (Duration == 0) Format(durationtext, sizeof(durationtext), "");
 		else {
@@ -86,7 +84,13 @@ BuildStoreMenu(client) {
 				Format(durationtext, sizeof(durationtext), "%s (%3.1f%s)\n%dH %dM %dS", durationtext, ItemStrength * 100.0, pct, Hours, Minutes, Seconds);
 			}
 		}
-		Format(Name_Temp, sizeof(Name_Temp), "%T", "Store Option", client, Name_Temp, StoreCost, durationtext);
+		decl String:AmountText[64];
+		Format(AmountText, sizeof(AmountText), "");
+		if (AmountMax > AmountMin && AmountMax != 0) Format(AmountText, sizeof(AmountText), "%T", "Store Amount Range", client, RoundToFloor(AmountMin * CheckExperienceRequirement(client)), RoundToFloor(AmountMax * CheckExperienceRequirement(client)));
+		else if (AmountMin > 0) Format(AmountText, sizeof(AmountText), "%T", "Store Amount Static", client, RoundToFloor(AmountMin * CheckExperienceRequirement(client)));
+		else if (Amount > 0) Format(AmountText, sizeof(AmountText), "%T", "Store Amount Static", client, Amount);
+		if (strlen(AmountText) >= 1) Format(AmountText, sizeof(AmountText), "(%s)", AmountText);
+		Format(Name_Temp, sizeof(Name_Temp), "%T", "Store Option", client, Name_Temp, StoreCost, durationtext, AmountText);
 		AddMenuItem(menu, Name_Temp, Name_Temp);
 	}
 
@@ -96,13 +100,16 @@ BuildStoreMenu(client) {
 
 stock GiveClientStoreItem(client, pos) {
 
-	decl String:key[64];
-	decl String:value[64];
+
+
 	decl String:slotvalue[64];
 
 	new Duration		= 0;
-	new amount			= 0;
-	decl String:itemeffect[64];
+	new Amount			= 0;
+	new Float:AmountMin	= 0.0;
+	new Float:AmountMax	= 0.0;
+
+	decl String:ItemEffect[64];
 
 	new Handle:Keys		= CreateArray(64);
 	new Handle:Values	= CreateArray(64);
@@ -110,16 +117,11 @@ stock GiveClientStoreItem(client, pos) {
 	Keys				= GetArrayCell(a_Store, pos, 0);
 	Values				= GetArrayCell(a_Store, pos, 1);
 
-	new size			= GetArraySize(Keys);
-	for (new i = 0; i < size; i++) {
-
-		GetArrayString(Handle:Keys, i, key, sizeof(key));
-		GetArrayString(Handle:Values, i, value, sizeof(value));
-
-		if (StrEqual(key, "duration?")) Duration			=	StringToInt(value);
-		else if (StrEqual(key, "amount?")) amount				=	StringToInt(value);
-		else if (StrEqual(key, "item effect?")) Format(itemeffect, sizeof(itemeffect), "%s", value);
-	}
+	Duration		= StringToInt(GetKeyValue(Keys, Values, "duration?"));
+	Format(ItemEffect, sizeof(ItemEffect), "%s", GetKeyValue(Keys, Values, "item effect?"));
+	Amount			= StringToInt(GetKeyValue(Keys, Values, "amount?"));
+	AmountMin		= StringToFloat(GetKeyValue(Keys, Values, "amount min?"));
+	AmountMax		= StringToFloat(GetKeyValue(Keys, Values, "amount max?"));
 
 	if (Duration > 0) {
 
@@ -127,20 +129,34 @@ stock GiveClientStoreItem(client, pos) {
 		Format(slotvalue, sizeof(slotvalue), "%d", StringToInt(slotvalue) + Duration);
 		SetArrayString(a_Store_Player[client], pos, slotvalue);
 	}
-	if (FindCharInString(itemeffect, 'r') != -1) {
+	if (FindCharInString(ItemEffect, 'r') != -1) {
 
 		FreeUpgrades[client]								=	PlayerUpgradesTotal[client];
 		PlayerUpgradesTotal[client] = 0;
 		WipeTalentPoints(client);
 	}
-	if (FindCharInString(itemeffect, 't') != -1) {
+	if (FindCharInString(ItemEffect, 't') != -1) {
 
-		FreeUpgrades[client]								+=	amount;
+		FreeUpgrades[client]								+=	Amount;
 	}
-	if (FindCharInString(itemeffect, 's') != -1) {
+	if (FindCharInString(ItemEffect, 's') != -1) {
 
-		SlatePoints[client]									+=	amount;
+		SlatePoints[client]									+=	Amount;
 	}
+	if (FindCharInString(ItemEffect, 'e') != -1) {
+
+		if (AmountMin > AmountMax) AmountMax					= AmountMin;
+		if (AmountMin != AmountMax) AmountMin					= GetRandomFloat(AmountMin, AmountMax);
+		ExperienceLevel[client]								+=	RoundToFloor(AmountMin * CheckExperienceRequirement(client));
+		ExperienceOverall[client]							+=	RoundToFloor(AmountMin * CheckExperienceRequirement(client));
+		if (ExperienceLevel[client] > CheckExperienceRequirement(client)) {
+
+			ExperienceOverall[client] -= (ExperienceLevel[client] - CheckExperienceRequirement(client));
+			ExperienceLevel[client] = CheckExperienceRequirement(client);
+		}
+	}
+	CloseHandle(Keys);
+	CloseHandle(Values);
 }
 
 public BuildStoreHandle(Handle:menu, MenuAction:action, client, slot) {
@@ -148,32 +164,27 @@ public BuildStoreHandle(Handle:menu, MenuAction:action, client, slot) {
 	if (action == MenuAction_Select) {
 
 		decl String:key[64];
-		decl String:value[64];
+
 		decl String:slotvalue[64];
-		decl String:itemeffect[64];
-		decl String:Name[64];
+
 
 		new StoreCost				=	0;
 		new Duration				=	0;
-		new amount					=	0;
+		new Amount					=	0;
+		new Float:AmountMin			=	0.0;
+		new Float:AmountMax			=	0.0;
+		decl String:ItemEffect[64];
 
 		MenuKeys[client]			=	GetArrayCell(a_Store, slot, 0);
 		MenuValues[client]			=	GetArrayCell(a_Store, slot, 1);
-		MenuSection[client]			=	GetArrayCell(a_Store, slot, 2);
 
-		GetArrayString(Handle:MenuSection[client], 0, Name, sizeof(Name));
+		StoreCost		= StringToInt(GetKeyValue(MenuKeys[client], MenuValues[client], "store cost?"));
+		Duration		= StringToInt(GetKeyValue(MenuKeys[client], MenuValues[client], "duration?"));
+		Format(ItemEffect, sizeof(ItemEffect), "%s", GetKeyValue(MenuKeys[client], MenuValues[client], "item effect?"));
+		Amount			= StringToInt(GetKeyValue(MenuKeys[client], MenuValues[client], "amount?"));
+		AmountMin		= StringToFloat(GetKeyValue(MenuKeys[client], MenuValues[client], "amount min?"));
+		AmountMax		= StringToFloat(GetKeyValue(MenuKeys[client], MenuValues[client], "amount max?"));
 
-		new size					=	GetArraySize(MenuKeys[client]);
-		for (new i = 0; i < size; i++) {
-
-			GetArrayString(Handle:MenuKeys[client], i, key, sizeof(key));
-			GetArrayString(Handle:MenuValues[client], i, value, sizeof(value));
-
-			if (StrEqual(key, "store cost?")) StoreCost				=	StringToInt(value);
-			else if (StrEqual(key, "duration?")) Duration			=	StringToInt(value);
-			else if (StrEqual(key, "amount?")) amount				=	StringToInt(value);
-			else if (StrEqual(key, "item effect?")) Format(itemeffect, sizeof(itemeffect), "%s", value);
-		}
 		if (SkyPoints[client] >= StoreCost && GetArraySize(a_Store_Player[client]) == GetArraySize(a_Store)) {
 
 			SkyPoints[client] -= StoreCost;
@@ -183,19 +194,48 @@ public BuildStoreHandle(Handle:menu, MenuAction:action, client, slot) {
 				Format(slotvalue, sizeof(slotvalue), "%d", StringToInt(slotvalue) + Duration);
 				SetArrayString(a_Store_Player[client], slot, slotvalue);
 			}
-			if (FindCharInString(itemeffect, 'r') != -1) {
+			if (FindCharInString(ItemEffect, 'r') != -1) {
 
 				FreeUpgrades[client]								+=	PlayerUpgradesTotal[client];
 				PlayerUpgradesTotal[client]							=	0;
 				WipeTalentPoints(client);
 			}
-			if (FindCharInString(itemeffect, 't') != -1) {
+			if (FindCharInString(ItemEffect, 't') != -1) {
 
-				FreeUpgrades[client]								+=	amount;
+				FreeUpgrades[client]								+=	Amount;
 			}
-			if (FindCharInString(itemeffect, 's') != -1) {
+			if (FindCharInString(ItemEffect, 's') != -1) {
 
-				SlatePoints[client]									+=	amount;
+				SlatePoints[client]									+=	Amount;
+			}
+			if (FindCharInString(ItemEffect, 'e') != -1) {
+
+				if (AmountMin > AmountMax) AmountMax					= AmountMin;
+				if (AmountMin != AmountMax) AmountMin					= GetRandomFloat(AmountMin, AmountMax);
+				ExperienceLevel[client]								+=	RoundToFloor(AmountMin * CheckExperienceRequirement(client));
+				ExperienceOverall[client]							+=	RoundToFloor(AmountMin * CheckExperienceRequirement(client));
+				if (ExperienceLevel[client] > CheckExperienceRequirement(client)) {
+
+					ExperienceOverall[client] -= (ExperienceLevel[client] - CheckExperienceRequirement(client));
+					ExperienceLevel[client] = CheckExperienceRequirement(client);
+				}
+			}
+			if (FindCharInString(ItemEffect, 'b') != -1) {
+
+				new pos = -1;
+				while (Amount > 0) {
+
+					pos = -1;
+					pos = IsStoreChance(client, client);
+					if (pos >= 0) AwardStoreItems(client, client, pos);
+					else {
+
+						pos = -1;
+						pos = IsLockedTalentChance(client);
+						if (pos >= 0) AwardLockedTalentItems(client, pos);
+					}
+					if (pos != -1) Amount--;
+				}
 			}
 		}
 		else if (GetArraySize(a_Store_Player[client]) != GetArraySize(a_Store)) {

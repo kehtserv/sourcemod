@@ -169,36 +169,15 @@ stock FindAbilityByTrigger(activator, target = 0, ability, zombieclass = 0, d_Da
 		new a_Size			=	0;
 
 		// Zombieclass is either ignored or passed as 0 If the player is a survivor. See stock FindZombieClass(client)
-		if (zombieclass == 0) a_Size		=	GetArraySize(a_Menu_Talents_Survivor);
-		else a_Size	=	GetArraySize(a_Menu_Talents_Infected);
-
-		//new b_Size			=	0;
+		a_Size				= GetArraySize(a_Menu_Talents);	// All talents share the same array, now. No more splitting based on team.
 
 		decl String:TalentName[64];
-		//decl String:s_key[64];
-		//decl String:s_value[64];
 
 		for (new i = 0; i < a_Size; i++) {
 
-			// We check if they are a survivor OR if zombieclass is 0, just to make sure survivors pull from their respective talent tree, regardless
-			// of what the zombieclass is passed as.
-			if (!IsFakeClient(activator) && (GetClientTeam(activator) == TEAM_SURVIVOR || zombieclass == 0)) {
-
-				TriggerKeys[activator]				=	GetArrayCell(a_Menu_Talents_Survivor, i, 0);
-				TriggerValues[activator]			=	GetArrayCell(a_Menu_Talents_Survivor, i, 1);
-				TriggerSection[activator]			=	GetArrayCell(a_Menu_Talents_Survivor, i, 2);
-			}
-			else if (GetClientTeam(activator) == TEAM_INFECTED) {
-
-				TriggerKeys[activator]				=	GetArrayCell(a_Menu_Talents_Infected, i, 0);
-				TriggerValues[activator]			=	GetArrayCell(a_Menu_Talents_Infected, i, 1);
-				TriggerSection[activator]			=	GetArrayCell(a_Menu_Talents_Infected, i, 2);
-			}
-			else {
-
-				LogMessage("Could not determine which talent section to pull from, cancelling ability trigger.");
-				return;
-			}
+			TriggerKeys[activator]				= GetArrayCell(a_Menu_Talents, i, 0);
+			TriggerValues[activator]			= GetArrayCell(a_Menu_Talents, i, 1);
+			TriggerSection[activator]			= GetArrayCell(a_Menu_Talents, i, 2);
 
 			// We get the name of the talent. It's not actually used for anything when it's passed through the ActivateAbility function, but I wanted to
 			// keep it in case I find a use for it, whether of debugging nature, or something else, later on.
@@ -211,19 +190,6 @@ stock FindAbilityByTrigger(activator, target = 0, ability, zombieclass = 0, d_Da
 
 				ActivateAbility(activator, target, i, d_Damage, FindZombieClass(activator), TriggerKeys[activator], TriggerValues[activator], TalentName, ability);
 			}
-
-			// This is the method used in v1.x, prior to the inclusion of the GetKeyValue function. This version is now deprecated, but it's still here for reference.
-			/*b_Size			=	GetArraySize(TriggerKeys[client]);
-			for (new ii = 0; ii < b_Size; ii++) {
-
-				GetArrayString(Handle:TriggerKeys[client], ii, s_key, sizeof(s_key));
-				GetArrayString(Handle:TriggerValues[client], ii, s_value, sizeof(s_value));
-
-				if (StrEqual(s_key, "ability trigger?") && FindCharInString(s_value, ability) != -1) {
-
-					ActivateAbility(client, victim, i, d_Damage, FindZombieClass(client), TriggerKeys[client], TriggerValues[client], TalentName, ability);
-				}
-			}*/
 		}
 	}
 }
@@ -251,6 +217,15 @@ stock ActivateAbility(activator, target, pos, damage, zombieclass, Handle:Keys, 
 		decl String:VictimZombieClass[64];
 		decl String:ClientZombieClassRequired[64];
 		decl String:VictimZombieClassRequired[64];
+		decl String:ClientModelRequired[64];
+		decl String:ClientModel[64];
+
+		if (GetClientTeam(activator) == TEAM_SURVIVOR) GetClientModel(activator, ClientModel, sizeof(ClientModel));
+		else if (GetClientTeam(target) == TEAM_SURVIVOR) GetClientModel(target, ClientModel, sizeof(ClientModel));
+
+		Format(ClientModelRequired, sizeof(ClientModelRequired), "-1");
+		if (GetClientTeam(activator) == TEAM_SURVIVOR ||
+			GetClientTeam(target) == TEAM_SURVIVOR) Format(ClientModelRequired, sizeof(ClientModelRequired), "%s", GetKeyValue(Keys, Values, "survivor required?"));
 
 		Format(ClientZombieClassRequired, sizeof(ClientZombieClassRequired), "%s", GetKeyValue(Keys, Values, "activator class required?"));
 		Format(VictimZombieClassRequired, sizeof(VictimZombieClassRequired), "%s", GetKeyValue(Keys, Values, "target class required?"));
@@ -266,78 +241,81 @@ stock ActivateAbility(activator, target, pos, damage, zombieclass, Handle:Keys, 
 		decl String:PlayerWeapon[64];
 		if (GetClientTeam(activator) == TEAM_INFECTED) Format(PlayerWeapon, sizeof(PlayerWeapon), "ignore");
 		else GetClientWeapon(activator, PlayerWeapon, sizeof(PlayerWeapon));
-		if (StrEqual(WeaponsPermitted, "ignore", false) || StrEqual(WeaponsPermitted, "all", false) || StrContains(WeaponsPermitted, PlayerWeapon, false) != -1) {
+		if (StrEqual(ClientModelRequired, "-1", false) || StrEqual(ClientModel, ClientModelRequired, false)) {
 
-			if (StrEqual(WeaponsPermittedStrict, "ignore", false) || StrEqual(WeaponsPermittedStrict, "all", false) || StrEqual(WeaponsPermittedStrict, PlayerWeapon, false)) {
+			if (StrEqual(WeaponsPermitted, "ignore", false) || StrEqual(WeaponsPermitted, "all", false) || StrContains(WeaponsPermitted, PlayerWeapon, false) != -1) {
 
-				if (target == 0) Format(VictimZombieClass, sizeof(VictimZombieClass), "-1");
-				else {
+				if (StrEqual(WeaponsPermittedStrict, "ignore", false) || StrEqual(WeaponsPermittedStrict, "all", false) || StrEqual(WeaponsPermittedStrict, PlayerWeapon, false)) {
 
-					if (GetClientTeam(target) == TEAM_INFECTED) Format(VictimZombieClass, sizeof(VictimZombieClass), "%d", FindZombieClass(target));
-					else Format(VictimZombieClass, sizeof(VictimZombieClass), "0");
-				}
-				if (GetClientTeam(activator) == TEAM_INFECTED) Format(ClientZombieClass, sizeof(ClientZombieClass), "%d", FindZombieClass(activator));
-				else Format(ClientZombieClass, sizeof(ClientZombieClass), "0");
+					if (target == 0) Format(VictimZombieClass, sizeof(VictimZombieClass), "-1");
+					else {
 
-				if (IsLegitimateClient(activator) && (StrContains(ClientZombieClassRequired, "0", false) != -1 && GetClientTeam(activator) == TEAM_SURVIVOR ||
-					StrContains(ClientZombieClassRequired, ClientZombieClass, false) != -1 && GetClientTeam(activator) == TEAM_INFECTED) &&
-					(target == 0 || (IsLegitimateClient(target) && (StrContains(VictimZombieClassRequired, "0", false) != -1 && GetClientTeam(target) == TEAM_SURVIVOR ||
-					StrContains(VictimZombieClassRequired, VictimZombieClass, false) != -1 && GetClientTeam(target) == TEAM_INFECTED)))) {
+						if (GetClientTeam(target) == TEAM_INFECTED) Format(VictimZombieClass, sizeof(VictimZombieClass), "%d", FindZombieClass(target));
+						else Format(VictimZombieClass, sizeof(VictimZombieClass), "0");
+					}
+					if (GetClientTeam(activator) == TEAM_INFECTED) Format(ClientZombieClass, sizeof(ClientZombieClass), "%d", FindZombieClass(activator));
+					else Format(ClientZombieClass, sizeof(ClientZombieClass), "0");
 
-					//if (StrEqual(key, "class required?") && (StringToInt(value) == zombieclass || (StringToInt(value) == 0 && GetClientTeam(client) == TEAM_SURVIVOR) || zombieclass == 9)) {
+					if (IsLegitimateClient(activator) && (StrContains(ClientZombieClassRequired, "0", false) != -1 && GetClientTeam(activator) == TEAM_SURVIVOR ||
+						StrContains(ClientZombieClassRequired, ClientZombieClass, false) != -1 && GetClientTeam(activator) == TEAM_INFECTED) &&
+						(target == 0 || (IsLegitimateClient(target) && (StrContains(VictimZombieClassRequired, "0", false) != -1 && GetClientTeam(target) == TEAM_SURVIVOR ||
+						StrContains(VictimZombieClassRequired, VictimZombieClass, false) != -1 && GetClientTeam(target) == TEAM_INFECTED)))) {
 
-					//if (!IsAbilityCooldown(client, TalentName) && !b_IsImmune[victim]) {
+						//if (StrEqual(key, "class required?") && (StringToInt(value) == zombieclass || (StringToInt(value) == 0 && GetClientTeam(client) == TEAM_SURVIVOR) || zombieclass == 9)) {
 
-					if (!IsAbilityCooldown(activator, TalentName) && !IsAbilityImmune(target, TalentName)) {
+						//if (!IsAbilityCooldown(client, TalentName) && !b_IsImmune[victim]) {
 
-						survivoreffects		=	FindAbilityEffects(activator, Keys, Values, 2, 0);
-						infectedeffects		=	FindAbilityEffects(activator, Keys, Values, 3, 0);
+						if (!IsAbilityCooldown(activator, TalentName) && !IsAbilityImmune(target, TalentName)) {
 
-						if (!IsFakeClient(activator)) i_Strength			=	GetTalentStrength(activator, TalentName) * 1.0;
-						else i_Strength									=	GetTalentStrength(-1, TalentName) * 1.0;
+							survivoreffects		=	FindAbilityEffects(activator, Keys, Values, 2, 0);
+							infectedeffects		=	FindAbilityEffects(activator, Keys, Values, 3, 0);
 
-						//i_Strength			=	1.0;
-						if (i_Strength <= 0.0) return;	// Locked talents will appear as LESS THAN 0.0 (they will be -1.0)
-							
-						i_FirstPoint		=	StringToFloat(GetKeyValue(Keys, Values, "first point value?"));
-						i_EachPoint			=	StringToFloat(GetKeyValue(Keys, Values, "increase per point?"));
-						i_Strength			=	i_FirstPoint + (i_EachPoint * i_Strength);
+							if (!IsFakeClient(activator)) i_Strength			=	GetTalentStrength(activator, TalentName) * 1.0;
+							else i_Strength									=	GetTalentStrength(-1, TalentName) * 1.0;
 
-						if (!IsFakeClient(activator)) i_Time				=	GetTalentStrength(activator, TalentName) * 1.0;
-						else i_Time										=	GetTalentStrength(-1, TalentName) * 1.0;
-						//i_Time					=	1.0;
-						if (i_Time > 0.0) i_Time	*=	StringToFloat(GetKeyValue(Keys, Values, "ability time per point?"));
+							//i_Strength			=	1.0;
+							if (i_Strength <= 0.0) return;	// Locked talents will appear as LESS THAN 0.0 (they will be -1.0)
+								
+							i_FirstPoint		=	StringToFloat(GetKeyValue(Keys, Values, "first point value?"));
+							i_EachPoint			=	StringToFloat(GetKeyValue(Keys, Values, "increase per point?"));
+							i_Strength			=	i_FirstPoint + (i_EachPoint * i_Strength);
 
-						if (!IsFakeClient(activator)) i_Cooldown			=	GetTalentStrength(activator, TalentName) * 1.0;
-						else i_Cooldown									=	GetTalentStrength(-1, TalentName) * 1.0;
+							if (!IsFakeClient(activator)) i_Time				=	GetTalentStrength(activator, TalentName) * 1.0;
+							else i_Time										=	GetTalentStrength(-1, TalentName) * 1.0;
+							//i_Time					=	1.0;
+							if (i_Time > 0.0) i_Time	*=	StringToFloat(GetKeyValue(Keys, Values, "ability time per point?"));
 
-						i_Cooldown				=	StringToFloat(GetKeyValue(Keys, Values, "cooldown start?")) + (StringToFloat(GetKeyValue(Keys, Values, "cooldown per point?")) * i_Cooldown);
-						//i_Cooldown				=	1.0;
+							if (!IsFakeClient(activator)) i_Cooldown			=	GetTalentStrength(activator, TalentName) * 1.0;
+							else i_Cooldown									=	GetTalentStrength(-1, TalentName) * 1.0;
 
-						if (TriggerAbility(activator, target, ability, pos, Keys, Values, TalentName)) {	//	Don't need to check if the player has ability points since the roll is 0 if they don't.
+							i_Cooldown				=	StringToFloat(GetKeyValue(Keys, Values, "cooldown start?")) + (StringToFloat(GetKeyValue(Keys, Values, "cooldown per point?")) * i_Cooldown);
+							//i_Cooldown				=	1.0;
 
-							if (i_Cooldown > 0.0) {
+							if (TriggerAbility(activator, target, ability, pos, Keys, Values, TalentName)) {	//	Don't need to check if the player has ability points since the roll is 0 if they don't.
 
-								//if (IsFakeClient(client)) LogMessage("Creating Cooldown for %N by attacker %N for %3.3f seconds", victim, client, i_Cooldown);
+								if (i_Cooldown > 0.0) {
 
-								/*if (IsClientActual(victim)) {
-									
-									b_IsImmune[victim] = true;
-									CreateTimer(i_Cooldown, Timer_IsNotImmune, victim, TIMER_FLAG_NO_MAPCHANGE);
-								}*/
-								if (IsClientActual(target)) CreateImmune(target, GetTalentPosition(target, TalentName), i_Cooldown);		// Immunities to individual talents so multiple talents can trigger!
-								if (IsClientActual(activator)) CreateCooldown(activator, GetTalentPosition(activator, TalentName), i_Cooldown);	// Infected Bots don't have cooldowns between abilities! Mwahahahaha
-							}
+									//if (IsFakeClient(client)) LogMessage("Creating Cooldown for %N by attacker %N for %3.3f seconds", victim, client, i_Cooldown);
 
-							if (!StrEqual(infectedeffects, "0")) {
+									/*if (IsClientActual(victim)) {
+										
+										b_IsImmune[victim] = true;
+										CreateTimer(i_Cooldown, Timer_IsNotImmune, victim, TIMER_FLAG_NO_MAPCHANGE);
+									}*/
+									if (IsClientActual(target)) CreateImmune(target, GetTalentPosition(target, TalentName), i_Cooldown);		// Immunities to individual talents so multiple talents can trigger!
+									if (IsClientActual(activator)) CreateCooldown(activator, GetTalentPosition(activator, TalentName), i_Cooldown);	// Infected Bots don't have cooldowns between abilities! Mwahahahaha
+								}
 
-								if (IsLegitimateClientAlive(activator) && GetClientTeam(activator) == TEAM_INFECTED) ActivateAbilityEx(activator, activator, damage, infectedeffects, i_Strength, i_Time);
-								else if (IsLegitimateClientAlive(target) && GetClientTeam(target) == TEAM_INFECTED) ActivateAbilityEx(target, activator, damage, infectedeffects, i_Strength, i_Time);
-							}
-							if (!StrEqual(survivoreffects, "0")) {
+								if (!StrEqual(infectedeffects, "0")) {
 
-								if (IsLegitimateClientAlive(activator) && GetClientTeam(activator) == TEAM_SURVIVOR) ActivateAbilityEx(activator, activator, damage, survivoreffects, i_Strength, i_Time);
-								else if (IsLegitimateClientAlive(target) && GetClientTeam(target) == TEAM_SURVIVOR) ActivateAbilityEx(target, activator, damage, survivoreffects, i_Strength, i_Time);
+									if (IsLegitimateClientAlive(activator) && GetClientTeam(activator) == TEAM_INFECTED) ActivateAbilityEx(activator, activator, damage, infectedeffects, i_Strength, i_Time);
+									else if (IsLegitimateClientAlive(target) && GetClientTeam(target) == TEAM_INFECTED) ActivateAbilityEx(target, activator, damage, infectedeffects, i_Strength, i_Time);
+								}
+								if (!StrEqual(survivoreffects, "0")) {
+
+									if (IsLegitimateClientAlive(activator) && GetClientTeam(activator) == TEAM_SURVIVOR) ActivateAbilityEx(activator, activator, damage, survivoreffects, i_Strength, i_Time);
+									else if (IsLegitimateClientAlive(target) && GetClientTeam(target) == TEAM_SURVIVOR) ActivateAbilityEx(target, activator, damage, survivoreffects, i_Strength, i_Time);
+								}
 							}
 						}
 					}
@@ -417,18 +395,9 @@ stock bool:AbilityChanceSuccess(client) {
 		new i_Strength		=	0;
 		new range			=	0;
 
-		if (GetClientTeam(client) == TEAM_SURVIVOR) {
-
-			AbilityKeys[client] 			=	GetArrayCell(a_Menu_Talents_Survivor, pos, 0);
-			AbilityValues[client]			=	GetArrayCell(a_Menu_Talents_Survivor, pos, 1);
-			AbilitySection[client]			=	GetArrayCell(a_Menu_Talents_Survivor, pos, 2);
-		}
-		else {
-
-			AbilityKeys[client] 			=	GetArrayCell(a_Menu_Talents_Infected, pos, 0);
-			AbilityValues[client]			=	GetArrayCell(a_Menu_Talents_Infected, pos, 1);
-			AbilitySection[client]			=	GetArrayCell(a_Menu_Talents_Infected, pos, 2);
-		}
+		AbilityKeys[client]			= GetArrayCell(a_Menu_Talents, pos, 0);
+		AbilityValues[client]		= GetArrayCell(a_Menu_Talents, pos, 1);
+		AbilitySection[client]		= GetArrayCell(a_Menu_Talents, pos, 2);
 
 		GetArrayString(Handle:AbilitySection[client], 0, talentname, sizeof(talentname));
 
@@ -486,10 +455,12 @@ stock GetTalentStrength(client, String:TalentName[]) {
 	return StringToInt(text);
 }
 
-stock String:GetKeyValue(Handle:Keys, Handle:Values, String:SearchKey[]) {
+stock String:GetKeyValue(Handle:Keys, Handle:Values, String:SearchKey[], String:DefaultValue[] = "none") {
 
 	decl String:key[1024];
 	decl String:value[1024];
+	if (StrEqual(DefaultValue, "none", false)) Format(value, sizeof(value), "-1");
+	else Format(value, sizeof(value), "%s", DefaultValue);
 
 	new size = GetArraySize(Keys);
 	for (new i = 0; i < size; i++) {
@@ -510,44 +481,22 @@ stock FindChanceRollAbility(client) {
 
 		new a_Size			=	0;
 
-		if (GetClientTeam(client) == TEAM_SURVIVOR) a_Size		=	GetArraySize(a_Menu_Talents_Survivor);
-		else a_Size	=	GetArraySize(a_Menu_Talents_Infected);
-
-		new b_Size			=	0;
+		a_Size		= GetArraySize(a_Menu_Talents);
 
 		decl String:TalentName[64];
-		decl String:s_key[64];
-		decl String:s_value[64];
 
 		for (new i = 0; i < a_Size; i++) {
 
-			if (GetClientTeam(client) == TEAM_SURVIVOR) {
-
-				ChanceKeys[client]				=	GetArrayCell(a_Menu_Talents_Survivor, i, 0);
-				ChanceValues[client]			=	GetArrayCell(a_Menu_Talents_Survivor, i, 1);
-				ChanceSection[client]			=	GetArrayCell(a_Menu_Talents_Survivor, i, 2);
-			}
-			else {
-
-				ChanceKeys[client]				=	GetArrayCell(a_Menu_Talents_Infected, i, 0);
-				ChanceValues[client]			=	GetArrayCell(a_Menu_Talents_Infected, i, 1);
-				ChanceSection[client]			=	GetArrayCell(a_Menu_Talents_Infected, i, 2);
-			}
+			ChanceKeys[client]			= GetArrayCell(a_Menu_Talents, i, 0);
+			ChanceValues[client]		= GetArrayCell(a_Menu_Talents, i, 1);
+			ChanceSection[client]		= GetArrayCell(a_Menu_Talents, i, 2);
 
 			GetArrayString(Handle:ChanceSection[client], 0, TalentName, sizeof(TalentName));
 
-			b_Size			=	GetArraySize(ChanceKeys[client]);
-			for (new ii = 0; ii < b_Size; ii++) {
+			if (GetClientTeam(client) == TEAM_SURVIVOR && FindCharInString(GetKeyValue(ChanceKeys[client], ChanceValues[client], "survivor ability effects?"), 'C') != -1 ||
+				GetClientTeam(client) == TEAM_INFECTED && FindCharInString(GetKeyValue(ChanceKeys[client], ChanceValues[client], "infected ability effects?"), 'C') != -1) {
 
-				GetArrayString(Handle:ChanceKeys[client], ii, s_key, sizeof(s_key));
-				GetArrayString(Handle:ChanceValues[client], ii, s_value, sizeof(s_value));
-
-				if ((GetClientTeam(client) == TEAM_SURVIVOR && StrEqual(s_key, "survivor ability effects?") ||
-					GetClientTeam(client) == TEAM_INFECTED && StrEqual(s_key, "infected ability effects?")) &&
-					FindCharInString(s_value, 'C') != -1) {
-
-					return i;
-				}
+				return i;
 			}
 		}
 	}

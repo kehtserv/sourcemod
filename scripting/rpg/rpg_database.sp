@@ -99,12 +99,12 @@ public DBConnect(Handle:owner, Handle:hndl, const String:error[], any:data)
 		decl String:key[64];
 		decl String:value[64];
 
-		new size			=	GetArraySize(a_Menu_Talents_Survivor);
+		new size			=	GetArraySize(a_Menu_Talents);
 		for (new i = 0; i < size; i++) {
 
-			DatabaseKeys			=	GetArrayCell(a_Menu_Talents_Survivor, i, 0);
-			DatabaseValues			=	GetArrayCell(a_Menu_Talents_Survivor, i, 1);
-			DatabaseSection			=	GetArrayCell(a_Menu_Talents_Survivor, i, 2);
+			DatabaseKeys			=	GetArrayCell(a_Menu_Talents, i, 0);
+			DatabaseValues			=	GetArrayCell(a_Menu_Talents, i, 1);
+			DatabaseSection			=	GetArrayCell(a_Menu_Talents, i, 2);
 
 			GetArrayString(Handle:DatabaseSection, 0, text, sizeof(text));
 			PushArrayString(Handle:a_Database_Talents_Defaults_Name, text);
@@ -119,34 +119,6 @@ public DBConnect(Handle:owner, Handle:hndl, const String:error[], any:data)
 
 					PushArrayString(Handle:a_Database_Talents_Defaults, value);
 
-					if (StringToInt(value) == 1) Format(tquery, sizeof(tquery), "ALTER TABLE `%s` ADD `%s` int(32) NOT NULL DEFAULT '0';", GetConfigValue("database prefix?"), text);
-					else Format(tquery, sizeof(tquery), "ALTER TABLE `%s` ADD `%s` int(32) NOT NULL DEFAULT '-1';", GetConfigValue("database prefix?"), text);
-					SQL_TQuery(hDatabase, QueryResults, tquery);
-
-					break;
-				}
-			}
-		}
-
-		size			=	GetArraySize(a_Menu_Talents_Infected);
-		for (new i = 0; i < size; i++) {
-
-			DatabaseKeys			=	GetArrayCell(a_Menu_Talents_Infected, i, 0);
-			DatabaseValues			=	GetArrayCell(a_Menu_Talents_Infected, i, 1);
-			DatabaseSection			=	GetArrayCell(a_Menu_Talents_Infected, i, 2);
-
-			GetArrayString(Handle:DatabaseSection, 0, text, sizeof(text));
-			PushArrayString(Handle:a_Database_Talents_Defaults_Name, text);
-
-			size2					=	GetArraySize(DatabaseKeys);
-			for (new ii = 0; ii < size2; ii++) {
-
-				GetArrayString(Handle:DatabaseKeys, ii, key, sizeof(key));
-				GetArrayString(Handle:DatabaseValues, ii, value, sizeof(value));
-
-				if (StrEqual(key, "ability inherited?")) {
-
-					PushArrayString(Handle:a_Database_Talents_Defaults, value);
 					if (StringToInt(value) == 1) Format(tquery, sizeof(tquery), "ALTER TABLE `%s` ADD `%s` int(32) NOT NULL DEFAULT '0';", GetConfigValue("database prefix?"), text);
 					else Format(tquery, sizeof(tquery), "ALTER TABLE `%s` ADD `%s` int(32) NOT NULL DEFAULT '-1';", GetConfigValue("database prefix?"), text);
 					SQL_TQuery(hDatabase, QueryResults, tquery);

@@ -793,10 +793,23 @@ stock IsLockedTalentChance(client, bool:bIsEndOfMapRoll = false) {
 
 	new random = 0;
 	decl String:text[64];
-	new size		= GetArraySize(a_Database_Talents_Defaults);
+
+	new Handle:Keys		= CreateArray(64);
+	new Handle:Values	= CreateArray(64);
+	new Handle:Section	= CreateArray(64);
+	new Float:weightMultiplier = 0.0;
+
+	new size		= GetArraySize(a_Menu_Talents);
 	for (new i = 0; i < size; i++) {
 
-		GetArrayString(Handle:a_Database_Talents_Defaults, i, text, sizeof(text));
+		Keys					= GetArrayCell(a_Menu_Talents, i, 0);
+		Values					= GetArrayCell(a_Menu_Talents, i, 1);
+		Section					= GetArrayCell(a_Menu_Talents, i, 2);
+		weightMultiplier		= StringToFloat(GetKeyValue(Keys, Values, "weight multiplier?"));
+		if (weightMultiplier < 0.0) weightMultiplier = 0.0;
+		else if (weightMultiplier > 2.0) weightMultiplier = 2.0;
+
+		GetArrayString(Handle:Section, 0, text, sizeof(text));
 
 		if (StringToInt(text) == 0) {	// talent is not inherited
 
@@ -806,11 +819,23 @@ stock IsLockedTalentChance(client, bool:bIsEndOfMapRoll = false) {
 				else if (IsClientActual(client) && FindZombieClass(client) == ZOMBIECLASS_TANK) random		= RoundToCeil(1.0 / StringToFloat(GetConfigValue("locked talent tank chance?")));
 				else random																					= RoundToCeil(1.0 / StringToFloat(GetConfigValue("locked talent common chance?")));
 			}
-			else random = RoundToCeil(1.0 / StringToFloat(GetConfigValue("talent chance end of map roll?")));
+			else {
+
+				random = RoundToCeil((1.0 / StringToFloat(GetConfigValue("talent chance end of map roll?"))) * weightMultiplier);
+			}
 			random			= GetRandomInt(1, random);
-			if (random == 1) return i;
+			if (random == 1) {
+
+				CloseHandle(Keys);
+				CloseHandle(Values);
+				CloseHandle(Section);
+				return i;
+			}
 		}
 	}
+	CloseHandle(Keys);
+	CloseHandle(Values);
+	CloseHandle(Section);
 	return -1;
 }
 
@@ -852,11 +877,15 @@ stock IsStoreChance(client, attacker, bool:bIsEndOfMapRoll = false) {
 
 	new random				= 0;
 	new size				= GetArraySize(a_Store);
+	new Float:weightMultiplier = 0.0;
 
 	for (new i = 0; i < size; i++) {
 
 		StoreChanceKeys[attacker]				= GetArrayCell(a_Store, i, 0);
 		StoreChanceValues[attacker]				= GetArrayCell(a_Store, i, 1);
+		weightMultiplier						= StringToFloat(GetKeyValue(StoreChanceKeys[attacker], StoreChanceValues[attacker], "weight multiplier?"));
+		if (weightMultiplier < 0.0) weightMultiplier = 0.0;
+		else if (weightMultiplier > 2.0) weightMultiplier = 2.0;
 
 		// There are some items a server operator may not WANT to be eligible to be awarded from world drops or end of map rolls. If that's the case, we skip it.
 		if (StringToInt(GetKeyValue(StoreChanceKeys[attacker], StoreChanceValues[attacker], "store purchase only?")) == 1) continue;
@@ -876,7 +905,7 @@ stock IsStoreChance(client, attacker, bool:bIsEndOfMapRoll = false) {
 				random								= RoundToCeil(1.0 / StringToFloat(GetKeyValue(StoreChanceKeys[attacker], StoreChanceValues[attacker], "common drop chance?")));
 			}
 		}
-		else random = RoundToCeil(1.0 / StringToFloat(GetConfigValue("store chance end of map roll?")));
+		else random = RoundToCeil((1.0 / StringToFloat(GetConfigValue("store chance end of map roll?"))) * weightMultiplier);
 		random									= GetRandomInt(1, random);
 		if (random == 1) return i;
 	}

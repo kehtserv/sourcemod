@@ -118,82 +118,158 @@ stock BuildMenu(client) {
 	VerifyUpgradeExperienceCost(client);
 	ClearArray(RPGMenuPosition[client]);
 
-	// Build the base menu here
-	new Handle:menu		=	CreateMenu(BuildMenuHandle);
+	// Build the base menu
+	new Handle:menu		= CreateMenu(BuildMenuHandle);
+	// Keep track of the position selected.
 	decl String:pos[64];
 
 	if (!b_IsDirectorTalents[client]) BuildMenuTitle(client, menu, _, 0);
 	else BuildMenuTitle(client, menu, 1);
 
 	decl String:text[PLATFORM_MAX_PATH];
+	// declare the variables for requirements to display in menu.
+	decl String:teamsAllowed[64];
+	decl String:gamemodesAllowed[64];
+	decl String:flagsAllowed[64];
+	decl String:currentGamemode[4];
+	decl String:clientTeam[4];
+	decl String:configname[64];
+	// Collect player team and server gamemode.
+	Format(currentGamemode, sizeof(currentGamemode), "%d", ReadyUp_GetGameMode());
+	Format(clientTeam, sizeof(clientTeam), "%d", GetClientTeam(client));
 
-	new a_Size			=	GetArraySize(a_Menu_Main);
-	new b_Size			=	0;
+	new size	= GetArraySize(a_Menu_Main);
 
-	for (new i = 0; i < a_Size; i++) {
+	for (new i = 0; i < size; i++) {
 
-		MenuKeys[client]			=	GetArrayCell(a_Menu_Main, i, 0);
-		MenuValues[client]			=	GetArrayCell(a_Menu_Main, i, 1);
-		b_Size			=	GetArraySize(MenuKeys[client]);
+		// Pull data from the parsed config.
+		MenuKeys[client]		= GetArrayCell(a_Menu_Main, i, 0);
+		MenuValues[client]		= GetArrayCell(a_Menu_Main, i, 1);
+		MenuSection[client]		= GetArrayCell(a_Menu_Main, i, 2);
+		
+		// Reset data in display requirement variables to default values.
+		Format(teamsAllowed, sizeof(teamsAllowed), "123");			// 1 (Spectator) 2 (Survivor) 3 (Infected) players allowed.
+		Format(gamemodesAllowed, sizeof(gamemodesAllowed), "123");	// 1 (Coop) 2 (Versus) 3 (Survival) game mode variants allowed.
+		Format(flagsAllowed, sizeof(flagsAllowed), "-1");			// -1 means no flag requirements specified.
+		
+		// Collect the display requirement variables values.
+		Format(teamsAllowed, sizeof(teamsAllowed), "%s", GetKeyValue(MenuKeys[client], MenuValues[client], "team?", teamsAllowed));
+		Format(gamemodesAllowed, sizeof(gamemodesAllowed), "%s", GetKeyValue(MenuKeys[client], MenuValues[client], "gamemode?", gamemodesAllowed));
+		Format(flagsAllowed, sizeof(flagsAllowed), "%s", GetKeyValue(MenuKeys[client], MenuValues[client], "flags?", flagsAllowed));
+		Format(configname, sizeof(configname), "%s", GetKeyValue(MenuKeys[client], MenuValues[client], "config?"));
+		
+		// If the player doesn't meet the requirements to have access to this menu option, we skip it.
+		if (StrContains(teamsAllowed, clientTeam, false) == -1 || StrContains(gamemodesAllowed, currentGamemode, false) == -1 ||
+			(!StrEqual(flagsAllowed, "-1", false) && !HasCommandAccess(client, flagsAllowed))) continue;
 
-		for (new ii = 0; ii < b_Size; ii++) {
+		// Some menu options display only under specific circumstances, regardless of the new mainmenu.cfg structure.
+		if (StringToInt(GetConfigValue("rpg mode?")) == 0 && !StrEqual(configname, CONFIG_POINTS)) continue;
+		if (GetArraySize(a_Store) < 1 && StrEqual(configname, CONFIG_STORE)) continue;
+		if (StringToInt(GetConfigValue("handicap enabled?")) == 0 && StrEqual(configname, "handicap")) continue;
 
-			GetArrayString(Handle:MenuValues[client], ii, text, sizeof(text));
-			if (StringToInt(GetConfigValue("rpg mode?")) == 0 && !StrEqual(text, CONFIG_POINTS)) continue;
+		// If director talent menu options is enabled by an admin, only specific options should show. We determine this here.
+		if (b_IsDirectorTalents[client]) {
 
-			//GetArrayString(Handle:MenuKeys[client], ii, text, sizeof(text));
+			if (StrEqual(configname, CONFIG_MENUTALENTS) || StrEqual(configname, CONFIG_POINTS) || StrEqual(configname, "level up")) {
 
-			if (GetArraySize(a_Store) < 1 && StrEqual(text, CONFIG_STORE)) continue;
-
-			if (StringToInt(GetConfigValue("handicap enabled?")) == 0 && StrEqual(text, "handicap")) continue;
-
-			if (b_IsDirectorTalents[client]) {
-
-				if (StrEqual(text, CONFIG_MENUINFECTED) || StrEqual(text, CONFIG_POINTS) || StrEqual(text, "level up")) {
-
-					//decl String:pos[64];
-					Format(pos, sizeof(pos), "%d", ii);
-					PushArrayString(Handle:RPGMenuPosition[client], pos);
-				}
-				else if (!StrEqual(text, "EOM")) continue;
+				Format(pos, sizeof(pos), "%d", i);
+				PushArrayString(Handle:RPGMenuPosition[client], pos);
 			}
-			if (StrEqual(text, "EOM")) break;
-
-			if (StrEqual(text, "level up")) {
-
-				if (!b_IsDirectorTalents[client]) {
-
-					if (PlayerUpgradesTotal[client] < MaximumPlayerUpgrades(client)) Format(text, sizeof(text), "%T", "level up unavailable", client, MaximumPlayerUpgrades(client) - PlayerUpgradesTotal[client]);
-					else Format(text, sizeof(text), "%T", "level up available", client, AddCommasToString(CheckExperienceRequirement(client)));
-				}
-				else {
-
-					if (PlayerLevelUpgrades_Bots < MaxUpgradesPerLevel()) Format(text, sizeof(text), "%T", "level up unavailable", client, MaxUpgradesPerLevel() - PlayerLevelUpgrades_Bots);
-					else Format(text, sizeof(text), "%T", "level up available", client, AddCommasToString(CheckExperienceRequirement(-1)));
-				}
-			}
-			else {
-
-				GetArrayString(Handle:MenuKeys[client], ii, text, sizeof(text));
-				Format(text, sizeof(text), "%T", text, client);
-			}
+			else continue;
+		}
+		if (StrEqual(configname, "level up")) {
 
 			if (!b_IsDirectorTalents[client]) {
 
-				if ((IsReserve(client) || StringToInt(GetConfigValue("all players chat settings?")) == 1) || !StrEqual(text, CONFIG_CHATSETTINGS)) {
-
-					//decl String:pos[64];
-					Format(pos, sizeof(pos), "%d", ii);
-					PushArrayString(Handle:RPGMenuPosition[client], pos);
-				}
-				else if (!StrEqual(text, "EOM")) continue;
+				if (PlayerUpgradesTotal[client] < MaximumPlayerUpgrades(client)) Format(text, sizeof(text), "%T", "level up unavailable", client, MaximumPlayerUpgrades(client) - PlayerUpgradesTotal[client]);
+				else Format(text, sizeof(text), "%T", "level up available", client, AddCommasToString(CheckExperienceRequirement(client)));
 			}
+			else {
 
-			AddMenuItem(menu, text, text);
+				if (PlayerLevelUpgrades_Bots < MaxUpgradesPerLevel()) Format(text, sizeof(text), "%T", "level up unavailable", client, MaxUpgradesPerLevel() - PlayerLevelUpgrades_Bots);
+				else Format(text, sizeof(text), "%T", "level up available", client, AddCommasToString(CheckExperienceRequirement(-1)));
+			}
 		}
+		else {
+
+			GetArrayString(Handle:MenuSection[client], 0, text, sizeof(text));
+			Format(text, sizeof(text), "%T", text, client);
+		}
+		// important that this specific statement about hiding/displaying menus is last, due to potential conflicts with director menus.
+		if (!b_IsDirectorTalents[client]) {
+
+			if ((HasCommandAccess(client, GetConfigValue("chat settings flags?")) || StringToInt(GetConfigValue("all players chat settings?")) == 1) || !StrEqual(configname, CONFIG_CHATSETTINGS)) {
+
+				Format(pos, sizeof(pos), "%d", i);
+				PushArrayString(Handle:RPGMenuPosition[client], pos);
+			}
+			else continue;
+		}
+
+		AddMenuItem(menu, text, text);
 	}
 	SetMenuExitBackButton(menu, true);
 	DisplayMenu(menu, client, 0);
+}
+
+public BuildMenuHandle(Handle:menu, MenuAction:action, client, slot) {
+
+	if (action == MenuAction_Select) {
+
+		// Declare variables for target config, menu name (some submenu's require this information) and the ACTUAL position for a slot
+		// (as pos won't always line up with slot since items can be hidden under special circumstances.)
+		decl String:config[64];
+		decl String:menuname[64];
+		decl String:pos[4];
+
+		// Get the real position to use based on the slot that was pressed.
+		// This position was stored above in the accompanying menu function.
+		GetArrayString(Handle:RPGMenuPosition[client], slot, pos, sizeof(pos));
+		MenuKeys[client]			= GetArrayCell(a_Menu_Main, StringToInt(pos), 0);
+		MenuValues[client]			= GetArrayCell(a_Menu_Main, StringToInt(pos), 1);
+		MenuSection[client]			= GetArrayCell(a_Menu_Main, StringToInt(pos), 2);
+		GetArrayString(Handle:MenuSection[client], 0, menuname, sizeof(menuname));
+
+		// We want to know the value of the target config based on the keys and values pulled.
+		// This will be used to determine where we send the player.
+		Format(config, sizeof(config), "%s", GetKeyValue(MenuKeys[client], MenuValues[client], "config?"));
+
+		// I've set it to not require case-sensitivity in case some moron decides to get cute.
+		if (StrEqual(config, "level up", false)) {
+
+			if (!b_IsDirectorTalents[client]) {
+
+				if (PlayerUpgradesTotal[client] >= MaximumPlayerUpgrades(client)) ExperienceBuyLevel(client);
+			}
+			else ExperienceBuyLevel(client, true);
+		}
+		else if (StrEqual(config, "handicap", false)) {
+
+			SendPanelToClientAndClose(PlayerHandicapMenu(client), client, PlayerHandicapHandle, MENU_TIME_FOREVER);
+		}
+		else if (StrEqual(config, CONFIG_CHATSETTINGS)) {
+
+			Format(ChatSettingsName[client], sizeof(ChatSettingsName[]), "none");
+			BuildChatSettingsMenu(client);
+		}
+		else if (StrEqual(config, CONFIG_MENUTALENTS)) {
+
+			// In previous versions of RPG, players could see, but couldn't open specific menus if the director talents were active.
+			// In this version, if director talents are active, you just can't see a talent with "activator class required?" that is strictly 0.
+			// However, values that are, say, "01" will show, as at least 1 infected class can use the talent.
+			BuildSubMenu(client, menuname, config);
+		}
+		else {
+
+			// A much safer method for grabbing the current config value for the MenuSelection.
+			Format(MenuSelection[client], sizeof(MenuSelection[]), "%s", config);
+			BuildPointsMenu(client, menuname, config);
+		}
+	}
+	else if (action == MenuAction_End) {
+
+		CloseHandle(menu);
+	}
 }
 
 stock PlayerTalentLevel(client) {
@@ -230,80 +306,6 @@ stock String:UpgradesUsed(client) {
 	Format(text, sizeof(text), "%T", "Upgrades Used", client);
 	Format(text, sizeof(text), "(%s: %d / %d)", text, PlayerUpgradesTotal[client], MaximumPlayerUpgrades(client));
 	return text;
-}
-
-public BuildMenuHandle(Handle:menu, MenuAction:action, client, slot)
-{
-	if (action == MenuAction_Select)
-	{
-		decl String:key[64];
-		decl String:value[64];
-
-		MenuKeys[client]			=	GetArrayCell(a_Menu_Main, 0, 0);
-		MenuValues[client]			=	GetArrayCell(a_Menu_Main, 0, 1);
-
-		/*if (!b_IsDirectorTalents[client]) {
-
-			GetArrayString(Handle:MenuKeys[client], slot, key, sizeof(key));
-			GetArrayString(Handle:MenuValues[client], slot, value, sizeof(value));
-		} else {
-
-			decl String:pos[64];
-			GetArrayString(Handle:RPGMenuPosition[client], slot, pos, sizeof(pos));
-			GetArrayString(Handle:MenuKeys[client], StringToInt(pos), key, sizeof(key));
-			GetArrayString(Handle:MenuValues[client], StringToInt(pos), value, sizeof(value));
-		}*/
-
-		decl String:pos[64];
-		GetArrayString(Handle:RPGMenuPosition[client], slot, pos, sizeof(pos));
-		GetArrayString(Handle:MenuKeys[client], StringToInt(pos), key, sizeof(key));
-		GetArrayString(Handle:MenuValues[client], StringToInt(pos), value, sizeof(value));
-
-		//if (b_IsDirectorTalents[client] && !StrEqual(value, CONFIG_MENUINFECTED) && !StrEqual(value, CONFIG_POINTS) && !StrEqual(value, "level up")) continue;
-
-		if (StrEqual(value, "level up")) {
-
-			if (!b_IsDirectorTalents[client]) {
-
-				if (PlayerUpgradesTotal[client] >= MaximumPlayerUpgrades(client)) ExperienceBuyLevel(client);
-			}
-			else ExperienceBuyLevel(client, true);
-		}
-		else if (StrEqual(value, "slate")) {
-
-			SendPanelToClientAndClose(SlateMenu(client), client, SlateHandle, MENU_TIME_FOREVER);
-		}
-		else if (GetArraySize(a_Store) > 0 && StrEqual(value, CONFIG_STORE)) {
-
-			BuildStoreMenu(client);
-		}
-		else if (StrEqual(value, "handicap")) {
-
-			SendPanelToClientAndClose(PlayerHandicapMenu(client), client, PlayerHandicapHandle, MENU_TIME_FOREVER);
-		}
-		else if (StrEqual(value, CONFIG_CHATSETTINGS)) {
-
-			Format(ChatSettingsName[client], sizeof(ChatSettingsName[]), "none");
-			BuildChatSettingsMenu(client);
-		}
-		else if (!StrEqual(value, CONFIG_POINTS)) {
-
-			if (StrEqual(value, CONFIG_MENUSURVIVOR) && b_IsDirectorTalents[client]) PrintToChat(client, "%T", "Director Talents Enabled, No Survivor Talents", client, green, white, green, GetConfigValue("director talent command?"), white);
-			else if (StrEqual(value, CONFIG_MENUINFECTED) && b_IsDirectorTalents[client] || !b_IsDirectorTalents[client]) {
-
-				BuildSubMenu(client, key, value);
-			}
-		}
-		else {
-
-			MenuSelection[client] = value;
-			BuildPointsMenu(client, key, value);
-		}
-	}
-	else if (action == MenuAction_End)
-	{
-		CloseHandle(menu);
-	}
 }
 
 public Handle:PlayerHandicapMenu(client) {
@@ -568,7 +570,7 @@ stock BuildSubMenu(client, String:MenuName[], String:ConfigName[]) {
 
 	if (!b_IsDirectorTalents[client]) {
 
-		if (StrEqual(ConfigName, CONFIG_MENUSURVIVOR) || StrEqual(ConfigName, CONFIG_MENUINFECTED)) {
+		if (StrEqual(ConfigName, CONFIG_MENUTALENTS)) {
 
 			BuildMenuTitle(client, menu, _, 1);
 		}
@@ -599,14 +601,17 @@ stock BuildSubMenu(client, String:MenuName[], String:ConfigName[]) {
 	decl String:key[64];
 	decl String:value[64];
 
-	new size						=	0;
+	new size						=	GetArraySize(a_Menu_Talents);
 
-	if (StrEqual(ConfigName, CONFIG_MENUSURVIVOR)) size			=	GetArraySize(a_Menu_Talents_Survivor);
-	else if (StrEqual(ConfigName, CONFIG_MENUINFECTED)) size	=	GetArraySize(a_Menu_Talents_Infected);
+	//if (StrEqual(ConfigName, CONFIG_MENUSURVIVOR)) size			=	GetArraySize(a_Menu_Talents_Survivor);
+	//else if (StrEqual(ConfigName, CONFIG_MENUINFECTED)) size	=	GetArraySize(a_Menu_Talents_Infected);
 
 	for (new i = 0; i < size; i++) {
 
-		if (StrEqual(ConfigName, CONFIG_MENUSURVIVOR)) {
+		MenuKeys[client]			= GetArrayCell(a_Menu_Talents, i, 0);
+		MenuValues[client]			= GetArrayCell(a_Menu_Talents, i, 1);
+		MenuSection[client]			= GetArrayCell(a_Menu_Talents, i, 2);
+		/*if (StrEqual(ConfigName, CONFIG_MENUSURVIVOR)) {
 
 			MenuKeys[client]			=	GetArrayCell(a_Menu_Talents_Survivor, i, 0);
 			MenuValues[client]			=	GetArrayCell(a_Menu_Talents_Survivor, i, 1);
@@ -617,7 +622,7 @@ stock BuildSubMenu(client, String:MenuName[], String:ConfigName[]) {
 			MenuKeys[client]			=	GetArrayCell(a_Menu_Talents_Infected, i, 0);
 			MenuValues[client]			=	GetArrayCell(a_Menu_Talents_Infected, i, 1);
 			MenuSection[client]			=	GetArrayCell(a_Menu_Talents_Infected, i, 2);
-		}
+		}*/
 
 		GetArrayString(Handle:MenuSection[client], 0, TalentName, sizeof(TalentName));
 
@@ -751,14 +756,17 @@ public BuildSubMenuHandle(Handle:menu, MenuAction:action, client, slot)
 		decl String:key[64];
 		decl String:value[64];
 
-		new size						=	0;
+		new size						=	GetArraySize(a_Menu_Talents);
 
-		if (StrEqual(ConfigName, CONFIG_MENUSURVIVOR)) size			=	GetArraySize(a_Menu_Talents_Survivor);
-		else if (StrEqual(ConfigName, CONFIG_MENUINFECTED)) size	=	GetArraySize(a_Menu_Talents_Infected);
+		//if (StrEqual(ConfigName, CONFIG_MENUSURVIVOR)) size			=	GetArraySize(a_Menu_Talents_Survivor);
+		//else if (StrEqual(ConfigName, CONFIG_MENUINFECTED)) size	=	GetArraySize(a_Menu_Talents_Infected);
 
 		for (new i = 0; i < size; i++) {
 
-			if (StrEqual(ConfigName, CONFIG_MENUSURVIVOR)) {
+			MenuKeys[client]				= GetArrayCell(a_Menu_Talents, i, 0);
+			MenuValues[client]				= GetArrayCell(a_Menu_Talents, i, 1);
+			MenuSection[client]				= GetArrayCell(a_Menu_Talents, i, 2);
+			/*if (StrEqual(ConfigName, CONFIG_MENUSURVIVOR)) {
 
 				MenuKeys[client]			=	GetArrayCell(a_Menu_Talents_Survivor, i, 0);
 				MenuValues[client]			=	GetArrayCell(a_Menu_Talents_Survivor, i, 1);
@@ -769,7 +777,7 @@ public BuildSubMenuHandle(Handle:menu, MenuAction:action, client, slot)
 				MenuKeys[client]			=	GetArrayCell(a_Menu_Talents_Infected, i, 0);
 				MenuValues[client]			=	GetArrayCell(a_Menu_Talents_Infected, i, 1);
 				MenuSection[client]			=	GetArrayCell(a_Menu_Talents_Infected, i, 2);
-			}
+			}*/
 
 			GetArrayString(Handle:MenuSection[client], 0, TalentName, sizeof(TalentName));
 
