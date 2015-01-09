@@ -1,5 +1,5 @@
 New updates will be added to this log. Version updates prior to v2.0.1 will not be listed, as they aren't relevant.
-v3.0.2 (In Development) <- Features Not Yet Implemented
+v3.0.3 (In Development) <- Features Not Yet Implemented
 +	Configurable game modes? re: gamemodes.cfg?
 	-	Something like...
 	"vip mode"
@@ -19,7 +19,52 @@ v3.0.2 (In Development) <- Features Not Yet Implemented
 	(The above is a sample config.)
 +	Weapon Level 2.0
 
-v3.0.1 (January 2, 2015) <- Current Release Version
+
+v3.0.2 (January 9, 2015) <- Current Release Version
++	Config File additions
+	-	Points.cfg has additional options:
+		+	"team?"
+			A required team can now be set. Multiple teams can be allocated, similar to the MainMenu.cfg key. Players not on one of the teams specified
+			will not see this menu option.
+		+	"gamemode?"
+			A required gamemode can now be set. Multiple gamemode's can be allocated, similar to the MainMenu.cfg key. If the gamemode is not found in the
+			list, the menu option will not appear.
+		+	"flags?"
+			Required user flags. Players are only required to match 1 (one) of the flags in the value, similar to the MainMenu.cfg key. If they do not, the
+			menu option will not appear for them. This is great for options that you want restricted to, say, just admins, such as director config menus.
++	Code Restructuring / Rewrite
+	-	In continuance with the restructuring and rewrite that I was in the process of when I released v3.0.1, additional source files have been heavily
+		modified or rewritten for efficiency and to iron out any wrinkles.
++	Chat Interface
+	-	Rewritten how the chat interface works.
+		Example:
+		(1) Skye
+		>> This is a simple test.
+		>> I was the last one to type, so it doesn't repeat my name.
+		(1) New Player
+		>> I'm not the last player to type, so it prints my name to everyone.
+		(1) Skye
+		>> Interesting.
++	Buy Menu
+	-	Melee Purchases
+		+	Rewrote code pertaining to the purchase of melee weapons, this time it works (I've tested it)
++	Melee Weapons
+	-	In previous versions of RPG, melee weapons were restricted to dealing no damage to special infected, because they would one-hit kill them.
+		A new config file, "rpg/melee.cfg" has been created. In this file, server operators dictate which melee weapons they want to deal damage to which
+		special infected, as well as how much damage they deal per swing.
+		If you don't want a melee weapon to damage a special infected, either omit it from the field, or set its value to 0.0.
+		If you don't want a certain special infected to receive damage from melee weapons, simply remove its id from the config.
+		+	Witch
+			Melee damage will still do nothing to witches. We do want them to be a credible threat after all, right?
++	Miscellaneous
+	-	Fixed several issues causing crashes.
+		Note:
+		There are still crashes occurring, and I'm working to debug them. You can help by connecting to the development server @ 192.223.26.135:27015
+		This version will be posted to the repository when the crashing stops.
+	-	Rested Experience
+		If maximum rested experience is "0", Maximum rested experience = the player's current maximum experience container.
+
+v3.0.1 (January 2, 2015)
 +	Config File restructuring
 	-	Talent Config files have been restructured.
 		survivormenu.cfg and infectedmenu.cfg have been merged into a single file: talentmenu.cfg. Using the old config names will no longer work.
