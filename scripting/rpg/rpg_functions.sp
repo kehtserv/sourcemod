@@ -65,6 +65,45 @@ stock FindAnyRandomClient() {
 	return -1;
 }
 
+stock bool:IsMeleeWeaponParameter(String:parameter[]) {
+
+	if (StrEqual(parameter, "fireaxe", false) ||
+		StrEqual(parameter, "cricket_bat", false) ||
+		StrEqual(parameter, "tonfa", false) ||
+		StrEqual(parameter, "frying_pan", false) ||
+		StrEqual(parameter, "golfclub", false) ||
+		StrEqual(parameter, "electric_guitar", false) ||
+		StrEqual(parameter, "katana", false) ||
+		StrEqual(parameter, "machete", false) ||
+		StrEqual(parameter, "crowbar", false)) return true;
+	return false;
+}
+
+stock GetMeleeWeaponDamage(attacker, victim, String:weapon[]) {
+
+	new zombieclass				= FindZombieClass(victim);
+	new size					= GetArraySize(a_Melee_Damage);
+	new healthvalue				= 0;
+
+	decl String:s_zombieclass[4];
+
+	for (new i = 0; i < size; i++) {
+
+		MeleeKeys[attacker]		= GetArrayCell(a_Melee_Damage, i, 0);
+		MeleeValues[attacker]	= GetArrayCell(a_Melee_Damage, i, 1);
+		MeleeSection[attacker]	= GetArrayCell(a_Melee_Damage, i, 2);
+
+		GetArrayString(Handle:MeleeSection[attacker], 0, s_zombieclass, sizeof(s_zombieclass));
+		if (StringToInt(s_zombieclass) == zombieclass) {
+
+			healthvalue			= RoundToFloor(StringToFloat(GetKeyValue(MeleeKeys[attacker], MeleeValues[attacker], weapon)) * GetMaximumHealth(victim));
+			if (healthvalue > GetClientTotalHealth(victim)) healthvalue		= GetClientTotalHealth(victim);
+			return healthvalue;
+		}
+	}
+	return 0;
+}
+
 /*
  *	Checks to see if the client has an active experience booster.
  *	If the client does, ExperienceValue is multiplied against the booster value and returned.
@@ -147,8 +186,9 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 		GetClientWeapon(attacker, weapon, sizeof(weapon));
 		if (StrEqual(weapon, "weapon_melee", false)) {
 
-			damage = 0.0;
-			PrintHintText(attacker, "%T", "melee against special", attacker);
+			//PrintToChat(attacker, "Damage: %3.3f, Target Max Health: %d", damage, GetMaximumHealth(victim));
+			damage = 1.0;
+			//PrintHintText(attacker, "%T", "melee against special", attacker);
 			return Plugin_Changed;
 		}
 	}
@@ -172,7 +212,6 @@ stock FindAbilityByTrigger(activator, target = 0, ability, zombieclass = 0, d_Da
 		a_Size				= GetArraySize(a_Menu_Talents);	// All talents share the same array, now. No more splitting based on team.
 
 		decl String:TalentName[64];
-
 		for (new i = 0; i < a_Size; i++) {
 
 			TriggerKeys[activator]				= GetArrayCell(a_Menu_Talents, i, 0);
@@ -181,6 +220,8 @@ stock FindAbilityByTrigger(activator, target = 0, ability, zombieclass = 0, d_Da
 
 			// We get the name of the talent. It's not actually used for anything when it's passed through the ActivateAbility function, but I wanted to
 			// keep it in case I find a use for it, whether of debugging nature, or something else, later on.
+
+			//PrintToChatAll("SIZE: %d", GetArraySize(TriggerSection[activator]));
 			GetArrayString(Handle:TriggerSection[activator], 0, TalentName, sizeof(TalentName));
 
 			// If the talent in question has an ability trigger that matches the ability trigger passed through, we call ActivateAbility.
@@ -1406,6 +1447,7 @@ stock ClearRelevantData() {
 		b_IsJumping[i]				= false;
 		CommonKills[i]				= 0;
 		CommonKillsHeadshot[i]		= 0;
+		bIsMeleeCooldown[i]			= false;
 
 		ResetOtherData(i);
 	}
@@ -1664,6 +1706,9 @@ public bool:ChatTrigger(client, args, bool:teamOnly) {
 	decl String:Message[MAX_CHAT_LENGTH];
 	decl String:Name[64];
 
+	decl String:authString[64];
+	GetClientAuthString(client, authString, sizeof(authString));
+
 	GetClientName(client, Name, sizeof(Name));
 	GetCmdArg(1, sBuffer, sizeof(sBuffer));
 	StripQuotes(sBuffer);
@@ -1724,10 +1769,18 @@ public bool:ChatTrigger(client, args, bool:teamOnly) {
 
 			if (IsLegitimateClient(i) && GetClientTeam(i) == GetClientTeam(client)) {
 
-				Client_PrintToChat(i, true, Message);
+				if (GetClientTeam(client) == TEAM_SPECTATOR && !StrEqual(Spectator_LastChatUser, authString, false) ||
+					GetClientTeam(client) == TEAM_SURVIVOR && !StrEqual(Survivor_LastChatUser, authString, false) ||
+					GetClientTeam(client) == TEAM_INFECTED && !StrEqual(Infected_LastChatUser, authString, false)) {
+
+					Client_PrintToChat(i, true, Message);
+				}
 				Client_PrintToChat(i, true, sBuffer);
 			}
 		}
+		if (GetClientTeam(client) == TEAM_SPECTATOR) Format(Spectator_LastChatUser, sizeof(Spectator_LastChatUser), "%s", authString);
+		else if (GetClientTeam(client) == TEAM_SURVIVOR) Format(Survivor_LastChatUser, sizeof(Survivor_LastChatUser), "%s", authString);
+		else if (GetClientTeam(client) == TEAM_INFECTED) Format(Infected_LastChatUser, sizeof(Infected_LastChatUser), "%s", authString);
 	}
 	else {
 
@@ -1735,10 +1788,14 @@ public bool:ChatTrigger(client, args, bool:teamOnly) {
 
 			if (IsLegitimateClient(i)) {
 
-				Client_PrintToChat(i, true, Message);
+				if (!StrEqual(Public_LastChatUser, authString, false)) {
+
+					Client_PrintToChat(i, true, Message);
+				}
 				Client_PrintToChat(i, true, sBuffer);
 			}
 		}
+		Format(Public_LastChatUser, sizeof(Public_LastChatUser), "%s", authString);
 	}
 	return false;
 }
@@ -1929,7 +1986,7 @@ stock bool:QuickCommandAccess(client, args, bool:b_IsTeamOnly) {
 
 							if (PointCost == 0.0 && GetClientTeam(client) == TEAM_SURVIVOR) {
 
-								if (StrContains(CheatParameter, "pistol", false) != -1) L4D_RemoveWeaponSlot(client, L4DWeaponSlot_Secondary);
+								if (StrContains(CheatParameter, "pistol", false) != -1 || IsMeleeWeaponParameter(CheatParameter)) L4D_RemoveWeaponSlot(client, L4DWeaponSlot_Secondary);
 								else L4D_RemoveWeaponSlot(client, L4DWeaponSlot_Primary);
 							}
 							ExecCheatCommand(client, CheatCommand, CheatParameter);
@@ -2289,17 +2346,20 @@ stock Float:TeamworkProximityMultiplier(client, bool:b_IsExperience) {
 	new Float:proximityMultiplierMinimum	= 0.0;
 	new Float:playerFlowDistance			= (L4D2Direct_GetFlowDistance(client) / g_MapFlowDistance);
 	new Float:teammateFlowDistance			= 0.0;
+	new Float:noMultiplierValue				= 0.0;
 
 	if (b_IsExperience) {
 
 		proximityDistanceBonus				= StringToFloat(GetConfigValue("teamwork proxy multiplier exp bonus?"));
 		proximityDistancePenalty			= StringToFloat(GetConfigValue("teamwork proxy multiplier exp penalty?"));
+		noMultiplierValue					= StringToFloat(GetConfigValue("experience multiplier survivor?"));
 		proximityMultiplierMinimum			= StringToFloat(GetConfigValue("teamwork proxy minimum multiplier exp?"));
 	}
 	else {
 
 		proximityDistanceBonus				= StringToFloat(GetConfigValue("teamwork proxy multiplier points bonus?"));
 		proximityDistancePenalty			= StringToFloat(GetConfigValue("teamwork proxy multiplier points penalty?"));
+		noMultiplierValue					= StringToFloat(GetConfigValue("points multiplier survivor?"));
 		proximityMultiplierMinimum			= StringToFloat(GetConfigValue("teamwork proxy minimum multiplier points?"));
 	}
 	new Float:playerProximityMultiplier		= 0.0;
@@ -2324,7 +2384,21 @@ stock Float:TeamworkProximityMultiplier(client, bool:b_IsExperience) {
 			}
 		}
 	}
-	if (playerProximityMultiplier < proximityMultiplierMinimum) playerProximityMultiplier = proximityMultiplierMinimum;
+
+	// We want to add the base award to the multiplied value, since all calculations are done here, now.
+	playerProximityMultiplier += noMultiplierValue;
+	
+	/*
+	Obviously, the value isn't allowed to be less than 0.0, because that would actually take points / experience from the player.
+	While I'm all for penalizing players, I think that's a little bit extreme, so we override the minimum setting from the config if its value is below 0.0;
+	*/
+	if (proximityMultiplierMinimum < 0.0) proximityMultiplierMinimum = 0.0;
+
+	/*
+	Now, we check to see if the total is below proximityMultiplierMinimum.
+	If it is, the total is equal to whatever its value is.
+	*/
+	if (playerProximityMultiplier < proximityMultiplierMinimum) return proximityMultiplierMinimum;
 	return playerProximityMultiplier;
 }
 

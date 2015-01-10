@@ -25,12 +25,67 @@
  * or <http://www.sourcemod.net/license.php>.
  */
 
+ /*
+ 	New Weapon Level System
+
+ 	+	weapons_menu.cfg
+ 		A list of all weapons that a server operator wants in the weapon level.
+ 		-	Must differentiate between actual weapon and weapon category, as well as
+ 			have starting experience to reach level 1 (because they start at level 0)
+ 			and the multiplier per level up, as well as the award for leveling up.
+ 		Example config:
+ 		"pistols"								// Because "weapon category?" is 1, this is the weapon category to search by, otherwise the weapon name goes here.
+ 		{
+ 			"weapon category?"			"1"			// This means it's a weapon category and not an actual weapon (governs more than 1 weapon)
+ 			"experience start?"			"1000"		// This is the experience that must be invested in this weapon (or category) to reach level 1.
+ 			"experience multiplier?"	"0.03"		// This is multiplied against the current experience requirement to determine the next level requirement.
+ 			"damage bonus per level?"	"0.01"		// 0.01 -> 1% (If you don't want this bonus, set to 0.0)
+ 			"maximum level?"			"100"		// It's possible a server operator may want different maximum levels for different weapons and/or categories. Here you go.
+ 		}
+ 	+	weapons_category.cfg
+ 		A list of all weapons categories that can be used in the weapons_menu.cfg, and
+ 		the weapons that are part of these categories.
+ 		Example config:
+ 		"pistols"
+ 		{
+ 			"weapons included?"			"pistol,pistol_magnum"
+ 		}
+ 	+	weapons_experience.cfg
+ 		A list of the options, as well as the values, that players can choose from when
+ 		deciding how much experience to invest in a category at a time.
+ 		Note*** If a player decides to invest 100% of their current experience, if the
+ 		experience spent is greater than the experience required to level up the
+ 		weapon (or category) it will simply carry over into the next level.
+ 		Example config:
+ 		"menu"
+ 		{
+ 			"25pct of requirement"		"0.25"
+ 			"50pct of requirement"		"0.5"
+ 			"75pct of requirement"		"0.75"
+ 			"100pct of requirement"		"1.0"
+ 			"all available experience"	"all"
+ 		}
+ 		The above would let the player choose from 5 options for adding experience from
+ 		their general experience container to the specified weapons' experience container.
+ 	+	weapons_bonuses.cfg
+ 		A list of all bonuses for a specified weapon (or category) as well as when the player automatically
+ 		receives them, if any. This is the cool part.
+ 		Example!
+ 		"pistols"	<-	This section name can be re-used, for categories that have more than 1 upgrade.
+ 		{
+ 			"weapon bonus?"				"l"			// l -> Laser sight designation. You can't see the laser on pistols, but it's still there.
+ 			"chance per level?"			"0.0"		// The chance to "trigger / acquire" the upgrade per level in this weapon or category. 0.0 ignores.
+ 			"acquire at level?"			"5"			// If it's an item that can be assigned (like fire, explosive ammo, laser sight) at which level
+ 														the player automatically receives it when they pick up (or purchase) the weapon(s)
+ 		}
+ */
+
 #define TEAM_SPECTATOR		1
 #define TEAM_SURVIVOR		2
 #define TEAM_INFECTED		3
 #define MAX_ENTITIES		2048
 #define MAX_CHAT_LENGTH		1024
-#define PLUGIN_VERSION		"3.0.1"
+#define PLUGIN_VERSION		"3.0.2"
 #define PLUGIN_CONTACT		"forums.alliedmods.net/showthread.php?p=2238303"
 #define PLUGIN_NAME			"SkyRPG"
 #define PLUGIN_DESCRIPTION	"A modular RPG plugin that reads user-generated config files"
@@ -44,7 +99,7 @@
 #define CONFIG_STORE				"rpg/store.cfg"
 #define CONFIG_TRAILS				"rpg/trails.cfg"
 #define CONFIG_CHATSETTINGS			"rpg/chatsettings.cfg"
-
+#define CONFIG_MELEEWEAPONS			"rpg/melee.cfg"
 #define LOGFILE				"rum_rpg.txt"
 #define DEBUG				false
 #define CVAR_SHOW			FCVAR_NOTIFY | FCVAR_PLUGIN
@@ -56,7 +111,6 @@
 #define ZOMBIECLASS_CHARGER											6
 #define ZOMBIECLASS_TANK											8
 #define ZOMBIECLASS_SURVIVOR										0
-
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
@@ -65,7 +119,6 @@
 #include "wrap.inc"
 #include "left4downtown.inc"
 #include "l4d_stocks.inc"
-
 #undef REQUIRE_PLUGIN
 #include "readyup.inc"
 
@@ -77,6 +130,15 @@ public Plugin:myinfo = {
 	url = PLUGIN_URL,
 };
 
+new bool:bIsMeleeCooldown[MAXPLAYERS + 1];
+new Handle:a_Melee_Damage;
+new Handle:MeleeKeys[MAXPLAYERS + 1];
+new Handle:MeleeValues[MAXPLAYERS + 1];
+new Handle:MeleeSection[MAXPLAYERS + 1];
+new String:Public_LastChatUser[64];
+new String:Infected_LastChatUser[64];
+new String:Survivor_LastChatUser[64];
+new String:Spectator_LastChatUser[64];
 new bool:b_IsLegacyMode;
 new String:currentCampaignName[64];
 new Float:g_MapFlowDistance;
@@ -129,6 +191,9 @@ new RoundDamageTotal;
 new SpecialsKilled;
 new CommonsKilled;
 new SurvivorsKilled;
+new Handle:LockedTalentKeys;
+new Handle:LockedTalentValues;
+new Handle:LockedTalentSection;
 new Handle:BoosterKeys[MAXPLAYERS + 1];
 new Handle:BoosterValues[MAXPLAYERS + 1];
 new Handle:StoreChanceKeys[MAXPLAYERS + 1];
@@ -516,6 +581,10 @@ public OnMapStart() {
 		if (a_DirectorActions == INVALID_HANDLE || !b_FirstLoad) a_DirectorActions								= CreateArray(3);
 		if (a_DirectorActions_Cooldown == INVALID_HANDLE || !b_FirstLoad) a_DirectorActions_Cooldown						= CreateArray(8);
 		if (a_ChatSettings == INVALID_HANDLE || !b_FirstLoad) a_ChatSettings								= CreateArray(3);
+		if (LockedTalentKeys == INVALID_HANDLE || !b_FirstLoad) LockedTalentKeys							= CreateArray(8);
+		if (LockedTalentValues == INVALID_HANDLE || !b_FirstLoad) LockedTalentValues						= CreateArray(8);
+		if (LockedTalentSection == INVALID_HANDLE || !b_FirstLoad) LockedTalentSection						= CreateArray(8);
+		if (a_Melee_Damage == INVALID_HANDLE || !b_FirstLoad) a_Melee_Damage							= CreateArray(3);
 
 		//LogMessage("main arrays created.");
 
@@ -560,6 +629,9 @@ public OnMapStart() {
 			if (h_KilledPosition_X[i] == INVALID_HANDLE || !b_FirstLoad) h_KilledPosition_X[i]				= CreateArray(8);
 			if (h_KilledPosition_Y[i] == INVALID_HANDLE || !b_FirstLoad) h_KilledPosition_Y[i]				= CreateArray(8);
 			if (h_KilledPosition_Z[i] == INVALID_HANDLE || !b_FirstLoad) h_KilledPosition_Z[i]				= CreateArray(8);
+			if (MeleeKeys[i] == INVALID_HANDLE || !b_FirstLoad) MeleeKeys[i]						= CreateArray(8);
+			if (MeleeValues[i] == INVALID_HANDLE || !b_FirstLoad) MeleeValues[i]					= CreateArray(8);
+			if (MeleeSection[i] == INVALID_HANDLE || !b_FirstLoad) MeleeSection[i]					= CreateArray(8);
 		}
 
 		if (!b_FirstLoad) b_FirstLoad = true;
@@ -770,6 +842,21 @@ public OnMapEnd() {
 			CloseHandle(Handle:a_ChatSettings);
 			a_ChatSettings = INVALID_HANDLE;
 		}
+		if (LockedTalentKeys != INVALID_HANDLE) {
+
+			CloseHandle(Handle:LockedTalentKeys);
+			LockedTalentKeys = INVALID_HANDLE;
+		}
+		if (LockedTalentValues != INVALID_HANDLE) {
+
+			CloseHandle(Handle:LockedTalentValues);
+			LockedTalentValues = INVALID_HANDLE;
+		}
+		if (LockedTalentSection != INVALID_HANDLE) {
+
+			CloseHandle(Handle:LockedTalentSection);
+			LockedTalentSection = INVALID_HANDLE;
+		}
 
 		for (new i = 1; i <= MAXPLAYERS; i++) {
 
@@ -975,7 +1062,6 @@ public OnConfigsExecuted() {
 
 		b_ConfigsExecuted = true;
 		CreateTimer(0.1, Timer_ExecuteConfig, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
-
 		ReadyUp_NtvGetCampaignName();
 	}
 }
@@ -992,6 +1078,7 @@ public Action:Timer_ExecuteConfig(Handle:timer) {
 		ReadyUp_ParseConfig(CONFIG_TRAILS);
 		ReadyUp_ParseConfig(CONFIG_CHATSETTINGS);
 		ReadyUp_ParseConfig(CONFIG_MAINMENU);
+		ReadyUp_ParseConfig(CONFIG_MELEEWEAPONS);
 		return Plugin_Stop;
 	}
 
@@ -1016,6 +1103,14 @@ stock RemoveMeleeWeapons() {
 }
 
 public ReadyUp_ReadyUpStart() {
+
+	/*
+	When a new round starts, we want to forget who was the last person to speak on different teams.
+	*/
+	Format(Public_LastChatUser, sizeof(Public_LastChatUser), "none");
+	Format(Spectator_LastChatUser, sizeof(Spectator_LastChatUser), "none");
+	Format(Survivor_LastChatUser, sizeof(Survivor_LastChatUser), "none");
+	Format(Infected_LastChatUser, sizeof(Infected_LastChatUser), "none");
 
 	for (new i = 1; i <= MaxClients; i++) {
 
@@ -1337,6 +1432,7 @@ public ReadyUp_RoundIsOver(gamemode) {
 		for (new i = 1; i <= MAXPLAYERS; i++) {
 
 			b_HardcoreMode[i] = false;
+			Points[i]			= 0.0;		// How was this never there, before?
 		}
 
 		for (new i = 1; i <= MaxClients; i++) {
@@ -1383,7 +1479,8 @@ public ReadyUp_ParseConfigFailed(String:config[], String:error[]) {
 		StrEqual(config, CONFIG_POINTS) ||
 		StrEqual(config, CONFIG_STORE) ||
 		StrEqual(config, CONFIG_TRAILS) ||
-		StrEqual(config, CONFIG_CHATSETTINGS)) {
+		StrEqual(config, CONFIG_CHATSETTINGS) ||
+		StrEqual(config, CONFIG_MELEEWEAPONS)) {
 	
 		SetFailState("%s , %s", config, error);
 	}
@@ -1400,7 +1497,8 @@ public ReadyUp_LoadFromConfigEx(Handle:key, Handle:value, Handle:section, String
 		!StrEqual(configname, CONFIG_POINTS) &&
 		!StrEqual(configname, CONFIG_STORE) &&
 		!StrEqual(configname, CONFIG_TRAILS) &&
-		!StrEqual(configname, CONFIG_CHATSETTINGS)) return;
+		!StrEqual(configname, CONFIG_CHATSETTINGS) &&
+		!StrEqual(configname, CONFIG_MELEEWEAPONS)) return;
 
 	decl String:s_key[64];
 	decl String:s_value[64];
@@ -1422,6 +1520,7 @@ public ReadyUp_LoadFromConfigEx(Handle:key, Handle:value, Handle:section, String
 		else if (StrEqual(configname, CONFIG_STORE)) ResizeArray(a_Store, keyCount);
 		else if (StrEqual(configname, CONFIG_TRAILS)) ResizeArray(a_Trails, keyCount);
 		else if (StrEqual(configname, CONFIG_CHATSETTINGS)) ResizeArray(a_ChatSettings, keyCount);
+		else if (StrEqual(configname, CONFIG_MELEEWEAPONS)) ResizeArray(a_Melee_Damage, keyCount);
 	}
 
 	//PrintToChatAll("CONFIG: %s", configname);
@@ -1454,6 +1553,7 @@ public ReadyUp_LoadFromConfigEx(Handle:key, Handle:value, Handle:section, String
 			else if (StrEqual(configname, CONFIG_STORE)) SetConfigArrays(configname, a_Store, TalentKeys, TalentValues, TalentSection, GetArraySize(a_Store), lastPosition - counter);
 			else if (StrEqual(configname, CONFIG_TRAILS)) SetConfigArrays(configname, a_Trails, TalentKeys, TalentValues, TalentSection, GetArraySize(a_Trails), lastPosition - counter);
 			else if (StrEqual(configname, CONFIG_CHATSETTINGS)) SetConfigArrays(configname, a_ChatSettings, TalentKeys, TalentValues, TalentSection, GetArraySize(a_ChatSettings), lastPosition - counter);
+			else if (StrEqual(configname, CONFIG_MELEEWEAPONS)) SetConfigArrays(configname, a_Melee_Damage, TalentKeys, TalentValues, TalentSection, GetArraySize(a_Melee_Damage), lastPosition - counter);
 			
 			lastPosition = i + 1;
 		}

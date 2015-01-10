@@ -223,6 +223,7 @@ public BuildStoreHandle(Handle:menu, MenuAction:action, client, slot) {
 			if (FindCharInString(ItemEffect, 'b') != -1) {
 
 				new pos = -1;
+				
 				while (Amount > 0) {
 
 					pos = -1;
@@ -263,8 +264,6 @@ stock bool:ValidItemClients() {
 stock RemoveStoreTime(client) {
 
 	decl String:key[64];
-	decl String:value[64];
-
 	decl String:PlayerValue[64];
 
 	new size								= GetArraySize(a_Store);
@@ -275,26 +274,18 @@ stock RemoveStoreTime(client) {
 		return;				// If their data hasn't loaded for the store, we skip them.
 	}
 	if (b_IsLoadingStore[client]) return;		// If their data is currently loading, we skip them.
-	new size2								= 0;
 	for (new i = 0; i < size; i++) {
 
 		StoreTimeKeys[client]				= GetArrayCell(a_Store, i, 0);
 		StoreTimeValues[client]				= GetArrayCell(a_Store, i, 1);
 
-		size2								= GetArraySize(StoreTimeKeys[client]);
-		for (new ii = 0; ii < size2; ii++) {
+		if (StringToInt(GetKeyValue(StoreTimeKeys[client], StoreTimeValues[client], "duration?")) > 0) {
 
-			GetArrayString(StoreTimeKeys[client], ii, key, sizeof(key));
-			GetArrayString(StoreTimeValues[client], ii, value, sizeof(value));
+			GetArrayString(a_Store_Player[client], i, PlayerValue, sizeof(PlayerValue));
+			if (StringToInt(PlayerValue) > 0) {
 
-			if (StrEqual(key, "duration?") && StringToInt(value) > 0) {
-
-				GetArrayString(a_Store_Player[client], i, PlayerValue, sizeof(PlayerValue));
-				if (StringToInt(PlayerValue) > 0) {
-
-					Format(PlayerValue, sizeof(PlayerValue), "%d", StringToInt(PlayerValue) - 1);
-					SetArrayString(a_Store_Player[client], i, PlayerValue);
-				}
+				Format(PlayerValue, sizeof(PlayerValue), "%d", StringToInt(PlayerValue) - 1);
+				SetArrayString(a_Store_Player[client], i, PlayerValue);
 			}
 		}
 	}

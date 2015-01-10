@@ -25,7 +25,9 @@ stock BuildMenuTitle(client, Handle:menu, bot = 0, type = 0) {	// 0 is legacy ty
 			Format(text2, sizeof(text2), "%T", "Free Upgrades", client);
 			Format(text, sizeof(text), "%s\n%s: %d", text, text2, FreeUpgrades[client]);
 		}
-		if (RestedExperience[client] > 0) Format(text, sizeof(text), "%T", "Menu Rested Experience", client, text, RestedExperience[client], StringToInt(GetConfigValue("rested experience maximum?")), RoundToCeil(100.0 * StringToFloat(GetConfigValue("rested experience multiplier?"))));
+		new RestedExperienceMaximum = StringToInt(GetConfigValue("rested experience maximum?"));
+		if (RestedExperienceMaximum < 1) RestedExperienceMaximum = CheckExperienceRequirement(client);
+		if (RestedExperience[client] > 0) Format(text, sizeof(text), "%T", "Menu Rested Experience", client, text, RestedExperience[client], RestedExperienceMaximum, RoundToCeil(100.0 * StringToFloat(GetConfigValue("rested experience multiplier?"))));
 	}
 	else {
 
@@ -157,7 +159,7 @@ stock BuildMenu(client) {
 		Format(gamemodesAllowed, sizeof(gamemodesAllowed), "%s", GetKeyValue(MenuKeys[client], MenuValues[client], "gamemode?", gamemodesAllowed));
 		Format(flagsAllowed, sizeof(flagsAllowed), "%s", GetKeyValue(MenuKeys[client], MenuValues[client], "flags?", flagsAllowed));
 		Format(configname, sizeof(configname), "%s", GetKeyValue(MenuKeys[client], MenuValues[client], "config?"));
-		
+
 		// If the player doesn't meet the requirements to have access to this menu option, we skip it.
 		if (StrContains(teamsAllowed, clientTeam, false) == -1 || StrContains(gamemodesAllowed, currentGamemode, false) == -1 ||
 			(!StrEqual(flagsAllowed, "-1", false) && !HasCommandAccess(client, flagsAllowed))) continue;
@@ -242,6 +244,14 @@ public BuildMenuHandle(Handle:menu, MenuAction:action, client, slot) {
 				if (PlayerUpgradesTotal[client] >= MaximumPlayerUpgrades(client)) ExperienceBuyLevel(client);
 			}
 			else ExperienceBuyLevel(client, true);
+		}
+		else if (StrEqual(config, "slate", false)) {
+
+			SendPanelToClientAndClose(SlateMenu(client), client, SlateHandle, MENU_TIME_FOREVER);
+		}
+		else if (GetArraySize(a_Store) > 0 && StrEqual(config, CONFIG_STORE)) {
+
+			BuildStoreMenu(client);
 		}
 		else if (StrEqual(config, "handicap", false)) {
 

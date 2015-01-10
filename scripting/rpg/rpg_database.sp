@@ -78,10 +78,6 @@ public DBConnect(Handle:owner, Handle:hndl, const String:error[], any:data)
 		SQL_TQuery(hDatabase, QueryResults, tquery);
 		Format(tquery, sizeof(tquery), "ALTER TABLE `%s` ADD `ccolour` varchar(32) NOT NULL DEFAULT 'none';", GetConfigValue("database prefix?"));
 		SQL_TQuery(hDatabase, QueryResults, tquery);
-		Format(tquery, sizeof(tquery), "ALTER TABLE `%s` ADD `rune` varchar(32) NOT NULL DEFAULT 'none';", GetConfigValue("database prefix?"));
-		SQL_TQuery(hDatabase, QueryResults, tquery);
-		Format(tquery, sizeof(tquery), "ALTER TABLE `%s` ADD `runelv` inr(32) NOT NULL DEFAULT '0';", GetConfigValue("database prefix?"));
-		SQL_TQuery(hDatabase, QueryResults, tquery);
 
 		/*new size			=	GetArraySize(a_Database_Talents);
 
@@ -108,6 +104,7 @@ public DBConnect(Handle:owner, Handle:hndl, const String:error[], any:data)
 
 			GetArrayString(Handle:DatabaseSection, 0, text, sizeof(text));
 			PushArrayString(Handle:a_Database_Talents_Defaults_Name, text);
+			//LogMessage("Pos: %d , Section: %s", i, text);
 
 			size2					=	GetArraySize(DatabaseKeys);
 			for (new ii = 0; ii < size2; ii++) {
@@ -202,6 +199,7 @@ stock ResetData(client) {
 	GravityBase[client]				= 1.0;
 	CommonKills[client]				= 0;
 	CommonKillsHeadshot[client]		= 0;
+	bIsMeleeCooldown[client]		= false;
 }
 
 stock ClearAndLoad(String:key[])
@@ -754,9 +752,11 @@ public QueryResults_Load(Handle:owner, Handle:hndl, const String:error[], any:cl
 					if (IsReserve(client)) RestedExperience[client] += StringToInt(GetConfigValue("rested experience earned donator?"));
 					else RestedExperience[client] += StringToInt(GetConfigValue("rested experience earned non-donator?"));
 				}
-				if (RestedExperience[client] > StringToInt(GetConfigValue("rested experience maximum?"))) {
+				new RestedExperienceMaximum = StringToInt(GetConfigValue("rested experience maximum?"));
+				if (RestedExperienceMaximum < 1) RestedExperienceMaximum = CheckExperienceRequirement(client);
+				if (RestedExperience[client] > RestedExperienceMaximum) {
 
-					RestedExperience[client] = StringToInt(GetConfigValue("rested experience maximum?"));
+					RestedExperience[client] = RestedExperienceMaximum;
 				}
 			}
 			if (resr[client] == 1) {
@@ -1045,6 +1045,7 @@ public OnClientDisconnect(client)
 {
 	if (IsClientInGame(client) && !IsFakeClient(client) && b_IsArraysCreated[client]) {
 
+		bIsMeleeCooldown[client] = false;
 		b_IsInSaferoom[client] = false;
 		b_IsArraysCreated[client] = false;
 		ResetData(client);

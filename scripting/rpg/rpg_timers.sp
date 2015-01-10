@@ -8,6 +8,15 @@ public Action:Timer_ZeroGravity(Handle:timer, any:client) {
 	return Plugin_Stop;
 }
 
+public Action:Timer_IsMeleeCooldown(Handle:timer, any:client) {
+
+	if (IsLegitimateClient(client)) {
+
+		bIsMeleeCooldown[client] = false;
+	}
+	return Plugin_Stop;
+}
+
 public Action:Timer_DeathCheck(Handle:timer) {
 
 	if (!b_IsActiveRound) {

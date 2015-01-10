@@ -16,15 +16,22 @@ stock BuildPointsMenu(client, String:MenuName[], String:ConfigName[]) {
 	decl String:Command[64];
 	decl String:IsCooldown[64];
 	Format(IsCooldown, sizeof(IsCooldown), "0");
-	decl String:key[64];
-	decl String:value[64];
 	decl String:quickCommand[64];
 	decl String:campaignSupported[512];
-	Format(campaignSupported, sizeof(campaignSupported), "none");
+	Format(campaignSupported, sizeof(campaignSupported), "-1");
 
+	decl String:teamsAllowed[64];
+	decl String:gamemodesAllowed[64];
+	decl String:flagsAllowed[64];
+	decl String:currentGamemode[64];
+	decl String:clientTeam[64];
+
+	// Collect player team and server gamemode.
+	Format(currentGamemode, sizeof(currentGamemode), "%d", ReadyUp_GetGameMode());
+	Format(clientTeam, sizeof(clientTeam), "%d", GetClientTeam(client));
 
 	new size						=	GetArraySize(a_Points);
-	if (size < 1) LogMessage("POINT MENU SIZE COULD NOT BE FOUND!!!");
+	if (size < 1) SetFailState("POINT MENU SIZE COULD NOT BE FOUND!!!");
 
 	for (new i = 0; i < size; i++) {
 
@@ -37,18 +44,30 @@ stock BuildPointsMenu(client, String:MenuName[], String:ConfigName[]) {
 		menuPos++;
 
 		Format(quickCommand, sizeof(quickCommand), "none");
-		new size2					=	GetArraySize(MenuKeys[client]);
-		for (new ii = 0; ii < size2; ii++) {
 
-			GetArrayString(Handle:MenuKeys[client], ii, key, sizeof(key));
-			GetArrayString(Handle:MenuValues[client], ii, value, sizeof(value));
+		// Reset data in display requirement variables to default values.
+		Format(teamsAllowed, sizeof(teamsAllowed), "123");			// 1 (Spectator) 2 (Survivor) 3 (Infected) players allowed.
+		Format(gamemodesAllowed, sizeof(gamemodesAllowed), "123");	// 1 (Coop) 2 (Versus) 3 (Survival) game mode variants allowed.
+		Format(flagsAllowed, sizeof(flagsAllowed), "-1");			// -1 means no flag requirements specified.
+		
+		// Collect the display requirement variables values.
+		Format(teamsAllowed, sizeof(teamsAllowed), "%s", GetKeyValue(MenuKeys[client], MenuValues[client], "team?", teamsAllowed));
+		Format(gamemodesAllowed, sizeof(gamemodesAllowed), "%s", GetKeyValue(MenuKeys[client], MenuValues[client], "gamemode?", gamemodesAllowed));
+		Format(flagsAllowed, sizeof(flagsAllowed), "%s", GetKeyValue(MenuKeys[client], MenuValues[client], "flags?", flagsAllowed));
+		
+		PointCost			= StringToFloat(GetKeyValue(MenuKeys[client], MenuValues[client], "point cost?"));
+		ExperienceCost		= StringToInt(GetKeyValue(MenuKeys[client], MenuValues[client], "experience cost?"));
+		Format(Command, sizeof(Command), "%s", GetKeyValue(MenuKeys[client], MenuValues[client], "command?", Command));
+		PointCostMinimum	= StringToFloat(GetKeyValue(MenuKeys[client], MenuValues[client], "point cost minimum?"));
+		Format(quickCommand, sizeof(quickCommand), "!%s", GetKeyValue(MenuKeys[client], MenuValues[client], "quick bind?"));
+		Format(campaignSupported, sizeof(campaignSupported), "%s", GetKeyValue(MenuKeys[client], MenuValues[client], "campaign supported?", campaignSupported));
 
-			if (StrEqual(key, "point cost?"))		PointCost			=	StringToFloat(value);
-			else if (StrEqual(key, "experience cost?"))	ExperienceCost	=	StringToInt(value);
-			else if (StrEqual(key, "command?")) Command					=	value;
-			else if (StrEqual(key, "point cost minimum?"))	PointCostMinimum	=	StringToFloat(value);
-			else if (StrEqual(key, "quick bind?")) Format(quickCommand, sizeof(quickCommand), "!%s", value);
-			else if (StrEqual(key, "campaign supported?")) Format(campaignSupported, sizeof(campaignSupported), "%s", value);
+		// If the player doesn't meet the requirements to have access to this menu option, we skip it.
+		if (StrContains(teamsAllowed, clientTeam, false) == -1 || StrContains(gamemodesAllowed, currentGamemode, false) == -1 ||
+			(!StrEqual(flagsAllowed, "-1", false) && !HasCommandAccess(client, flagsAllowed))) {
+
+			menuPos--;
+			continue;
 		}
 
 		if (StrEqual(Command, "respawn") && IsPlayerAlive(client)) {
@@ -57,12 +76,11 @@ stock BuildPointsMenu(client, String:MenuName[], String:ConfigName[]) {
 			continue;
 		}
 
-		if (StrEqual(Command, "melee") && StrContains(campaignSupported, currentCampaignName, false) == -1) {
+		if (!StrEqual(campaignSupported, "-1", false) && StrContains(campaignSupported, currentCampaignName, false) == -1) {
 
 			menuPos--;
 			continue;
 		}
-
 		Format(Name_Temp, sizeof(Name_Temp), "%T", Name, client);
 		if (FindCharInString(Command, ':') != -1) Format(text, sizeof(text), "%T", "Buy Menu Option 1", client, Name_Temp, quickCommand);
 		else {
@@ -119,6 +137,7 @@ public BuildPointsMenuHandle(Handle:menu, MenuAction:action, client, slot) {
 		decl String:Command[64];
 		decl String:Parameter[64];
 		decl String:campaignSupported[512];
+		Format(campaignSupported, sizeof(campaignSupported), "-1");	// If there's no value for it, ignore.
 
 		new Float:PointCost				=	0.0;
 		new Float:PointCostMinimum		=	0.0;
@@ -129,9 +148,17 @@ public BuildPointsMenuHandle(Handle:menu, MenuAction:action, client, slot) {
 		decl String:Model[64];
 		decl String:IsCooldown[64];
 		Format(IsCooldown, sizeof(IsCooldown), "0");
-		decl String:key[64];
-		decl String:value[64];
 		new TargetClient				=	-1;
+
+		decl String:teamsAllowed[64];
+		decl String:gamemodesAllowed[64];
+		decl String:flagsAllowed[64];
+		decl String:currentGamemode[64];
+		decl String:clientTeam[64];
+
+		// Collect player team and server gamemode.
+		Format(currentGamemode, sizeof(currentGamemode), "%d", ReadyUp_GetGameMode());
+		Format(clientTeam, sizeof(clientTeam), "%d", GetClientTeam(client));
 
 		new size						=	GetArraySize(a_Points);
 
@@ -148,25 +175,41 @@ public BuildPointsMenuHandle(Handle:menu, MenuAction:action, client, slot) {
 			if (!TalentListingFound(client, MenuKeys[client], MenuValues[client], MenuName)) continue;
 			menuPos++;
 
-			new size2					=	GetArraySize(MenuKeys[client]);
-			for (new ii = 0; ii < size2; ii++) {
+			// Reset data in display requirement variables to default values.
+			Format(teamsAllowed, sizeof(teamsAllowed), "123");			// 1 (Spectator) 2 (Survivor) 3 (Infected) players allowed.
+			Format(gamemodesAllowed, sizeof(gamemodesAllowed), "123");	// 1 (Coop) 2 (Versus) 3 (Survival) game mode variants allowed.
+			Format(flagsAllowed, sizeof(flagsAllowed), "-1");			// -1 means no flag requirements specified.
+			
+			// Collect the display requirement variables values.
+			Format(teamsAllowed, sizeof(teamsAllowed), "%s", GetKeyValue(MenuKeys[client], MenuValues[client], "team?", teamsAllowed));
+			Format(gamemodesAllowed, sizeof(gamemodesAllowed), "%s", GetKeyValue(MenuKeys[client], MenuValues[client], "gamemode?", gamemodesAllowed));
+			Format(flagsAllowed, sizeof(flagsAllowed), "%s", GetKeyValue(MenuKeys[client], MenuValues[client], "flags?", flagsAllowed));
+			
+			PointCost			= StringToFloat(GetKeyValue(MenuKeys[client], MenuValues[client], "point cost?"));
+			ExperienceCost		= StringToInt(GetKeyValue(MenuKeys[client], MenuValues[client], "experience cost?"));
+			Format(Command, sizeof(Command), "%s", GetKeyValue(MenuKeys[client], MenuValues[client], "command?", Command));
+			PointCostMinimum	= StringToFloat(GetKeyValue(MenuKeys[client], MenuValues[client], "point cost minimum?"));
+			Format(campaignSupported, sizeof(campaignSupported), "%s", GetKeyValue(MenuKeys[client], MenuValues[client], "campaign supported?", campaignSupported));
+			Format(Parameter, sizeof(Parameter), "%s", GetKeyValue(MenuKeys[client], MenuValues[client], "parameter?", Parameter));
+			Format(Model, sizeof(Model), "%s", GetKeyValue(MenuKeys[client], MenuValues[client], "model?", Model));
+			Count				= StringToInt(GetKeyValue(MenuKeys[client], MenuValues[client], "count?"));
+			CountHandicap		= StringToInt(GetKeyValue(MenuKeys[client], MenuValues[client], "count handicap?"));
+			Drop				= StringToInt(GetKeyValue(MenuKeys[client], MenuValues[client], "drop?"));
 
-				GetArrayString(Handle:MenuKeys[client], ii, key, sizeof(key));
-				GetArrayString(Handle:MenuValues[client], ii, value, sizeof(value));
+			// If the player doesn't meet the requirements to have access to this menu option, we skip it.
+			if (StrContains(teamsAllowed, clientTeam, false) == -1 || StrContains(gamemodesAllowed, currentGamemode, false) == -1 ||
+				(!StrEqual(flagsAllowed, "-1", false) && !HasCommandAccess(client, flagsAllowed))) {
 
-				if (StrEqual(key, "point cost?"))		PointCost			=	StringToFloat(value);
-				else if (StrEqual(key, "experience cost?"))	ExperienceCost	=	StringToInt(value);
-				else if (StrEqual(key, "command?"))		Command				=	value;
-				else if (StrEqual(key, "parameter?"))	Parameter			=	value;
-				else if (StrEqual(key, "model?"))		Format(Model, sizeof(Model), "%s", value);
-				else if (StrEqual(key, "count?"))		Count				=	StringToInt(value);
-				else if (StrEqual(key, "count handicap?")) CountHandicap	=	StringToInt(value);
-				else if (StrEqual(key, "drop?"))		Drop				=	StringToInt(value);
-				else if (StrEqual(key, "point cost minimum?")) PointCostMinimum	=	StringToFloat(value);
-				else if (StrEqual(key, "campaign supported?")) Format(campaignSupported, sizeof(campaignSupported), "%s", value);
+				menuPos--;
+				continue;
 			}
 
 			if (StrEqual(Command, "respawn") && IsPlayerAlive(client)) {
+
+				menuPos--;
+				continue;
+			}
+			if (!StrEqual(campaignSupported, "-1", false) && StrContains(campaignSupported, currentCampaignName, false) == -1) {
 
 				menuPos--;
 				continue;
@@ -256,20 +299,21 @@ public BuildPointsMenuHandle(Handle:menu, MenuAction:action, client, slot) {
 						SDKCall(hRoundRespawn, client);
 						CreateTimer(0.2, Timer_TeleportRespawn, client, TIMER_FLAG_NO_MAPCHANGE);
 					}
-					else if (StrEqual(Command, "melee") && StrContains(campaignSupported, currentCampaignName, false) != -1) {
+					else if (StrEqual(campaignSupported, "-1", false) || StrContains(campaignSupported, currentCampaignName, false) != -1) {
 
-						new ent			= CreateEntityByName("weapon_melee");
+						/*new ent			= CreateEntityByName("weapon_melee");
 
 						DispatchKeyValue(ent, "melee_script_name", Parameter);
 						DispatchSpawn(ent);
 
-						EquipPlayerWeapon(client, ent);
+						EquipPlayerWeapon(client, ent);*/
+						ExecCheatCommand(client, Command, Parameter);
 					}
 					else {
 
 						if (PointCost == 0.0 && GetClientTeam(client) == TEAM_SURVIVOR) {
 
-							if (StrContains(Parameter, "pistol", false) != -1) L4D_RemoveWeaponSlot(client, L4DWeaponSlot_Secondary);
+							if (StrContains(Parameter, "pistol", false) != -1 || IsMeleeWeaponParameter(Parameter)) L4D_RemoveWeaponSlot(client, L4DWeaponSlot_Secondary);
 							else L4D_RemoveWeaponSlot(client, L4DWeaponSlot_Primary);
 						}
 

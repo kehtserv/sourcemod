@@ -56,11 +56,11 @@ v3.0.2 (January 9, 2015) <- Current Release Version
 		If you don't want a certain special infected to receive damage from melee weapons, simply remove its id from the config.
 		+	Witch
 			Melee damage will still do nothing to witches. We do want them to be a credible threat after all, right?
+	-	New Talent Options
+		+	"b"		For the survivor who deals damage to a special infected with a melee weapon.
+		+	"B"		For the infected (not commons) who receive damage from a survivor via a melee weapon.
 +	Miscellaneous
 	-	Fixed several issues causing crashes.
-		Note:
-		There are still crashes occurring, and I'm working to debug them. You can help by connecting to the development server @ 192.223.26.135:27015
-		This version will be posted to the repository when the crashing stops.
 	-	Rested Experience
 		If maximum rested experience is "0", Maximum rested experience = the player's current maximum experience container.
 

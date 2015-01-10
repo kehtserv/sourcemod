@@ -142,6 +142,7 @@ public Call_Event(Handle:event, String:event_name[], bool:dontBroadcast, pos) {
 			else if (StrEqual(s_key, "EOM")) break;
 		}
 	}
+	//deathaward = 0;
 
 	if ((IsLegitimateClient(attacker) && !IsFakeClient(attacker) && b_IsLoading[attacker]) || (IsLegitimateClient(victim) && !IsFakeClient(victim) && b_IsLoading[victim])) return;
 	if (attacker > 0 && IsLegitimateClient(attacker) && !IsFakeClient(attacker) && PlayerLevel[attacker] == 0 && !b_IsLoading[attacker]) {
@@ -636,6 +637,37 @@ public Call_Event(Handle:event, String:event_name[], bool:dontBroadcast, pos) {
 							damagetype != 8 && damagetype != 268435464 && !StrEqual(weapon, "inferno") && IsPlayerAlive(victim) &&
 							!RestrictedWeaponList(weapon)) {
 
+						if (StrEqual(weapon, "melee", false) && !bIsMeleeCooldown[attacker]) {
+
+							new g_iActiveWeaponOffset = FindSendPropInfo("CTerrorPlayer", "m_hActiveWeapon");
+							new iWeapon = GetEntDataEnt2(attacker, g_iActiveWeaponOffset);
+							GetEdictClassname(iWeapon, weapon, sizeof(weapon));
+							GetEntPropString(iWeapon, Prop_Data, "m_strMapSetScriptName", weapon, sizeof(weapon));
+							SetEventString(event, "weapon", weapon);
+
+							/*
+							Melee weapons deal damage multiple times per swing, depending on the weapon.
+							Example: tonfa hits 4 times / swing, while the Fireaxe hits 8 times / swing.
+							Because a new talent option allows for damage dealt by a melee weapon, we don't want it to be able to trigger multiple times.
+							Also, calculating damage only once per swing is easier for both config construction by server operators and my sanity, besides, it's just as good.
+							*/
+							bIsMeleeCooldown[attacker] = true;
+							CreateTimer(0.5, Timer_IsMeleeCooldown, attacker, TIMER_FLAG_NO_MAPCHANGE);
+							
+							/*
+							We determine the healthvalue from the melee file.
+							*/
+							healthvalue		= GetMeleeWeaponDamage(attacker, victim, weapon);
+
+							/*
+							Finally, we trigger talents that require melee weapons (new as of v3.0.3)
+							*/
+							FindAbilityByTrigger(attacker, victim, 'b', FindZombieClass(attacker), healthvalue);
+							FindAbilityByTrigger(victim, attacker, 'B', FindZombieClass(victim), healthvalue);
+						}
+
+
+
 						FindAbilityByTrigger(attacker, victim, 'D', FindZombieClass(attacker), healthvalue);
 						FindAbilityByTrigger(victim, attacker, 'L', FindZombieClass(victim), healthvalue);
 						if (RoundToFloor(DamageMultiplier[attacker] * healthvalue) >= GetClientTotalHealth(victim)) ForcePlayerSuicide(victim);	// We'll have to make a talent that, instead of suicide restores health, just for infected, as survivors have rebirth.
@@ -794,22 +826,19 @@ stock IsLockedTalentChance(client, bool:bIsEndOfMapRoll = false) {
 	new random = 0;
 	decl String:text[64];
 
-	new Handle:Keys		= CreateArray(64);
-	new Handle:Values	= CreateArray(64);
-	new Handle:Section	= CreateArray(64);
 	new Float:weightMultiplier = 0.0;
 
 	new size		= GetArraySize(a_Menu_Talents);
 	for (new i = 0; i < size; i++) {
 
-		Keys					= GetArrayCell(a_Menu_Talents, i, 0);
-		Values					= GetArrayCell(a_Menu_Talents, i, 1);
-		Section					= GetArrayCell(a_Menu_Talents, i, 2);
-		weightMultiplier		= StringToFloat(GetKeyValue(Keys, Values, "weight multiplier?"));
+		LockedTalentKeys		= GetArrayCell(a_Menu_Talents, i, 0);
+		LockedTalentValues		= GetArrayCell(a_Menu_Talents, i, 1);
+		LockedTalentSection		= GetArrayCell(a_Menu_Talents, i, 2);
+		weightMultiplier		= StringToFloat(GetKeyValue(LockedTalentKeys, LockedTalentValues, "weight multiplier?"));
 		if (weightMultiplier < 0.0) weightMultiplier = 0.0;
 		else if (weightMultiplier > 2.0) weightMultiplier = 2.0;
 
-		GetArrayString(Handle:Section, 0, text, sizeof(text));
+		GetArrayString(Handle:LockedTalentSection, 0, text, sizeof(text));
 
 		if (StringToInt(text) == 0) {	// talent is not inherited
 
@@ -824,18 +853,9 @@ stock IsLockedTalentChance(client, bool:bIsEndOfMapRoll = false) {
 				random = RoundToCeil((1.0 / StringToFloat(GetConfigValue("talent chance end of map roll?"))) * weightMultiplier);
 			}
 			random			= GetRandomInt(1, random);
-			if (random == 1) {
-
-				CloseHandle(Keys);
-				CloseHandle(Values);
-				CloseHandle(Section);
-				return i;
-			}
+			if (random == 1) return i;
 		}
 	}
-	CloseHandle(Keys);
-	CloseHandle(Values);
-	CloseHandle(Section);
 	return -1;
 }
 
@@ -1278,6 +1298,7 @@ public CalculateDamageAward(client) {
 
 				teamworkExperienceMultiplier		= TeamworkProximityMultiplier(i, true);
 				teamworkPointsMultiplier			= TeamworkProximityMultiplier(i, false);
+				//PrintToChatAll("teamexpmult: %3.3f , teampointmult: %3.3f", teamworkExperienceMultiplier, teamworkPointsMultiplier);
 
 				// Add the survivors' current position to the list of kill spots, so they can't get experience if standing too close to this location, again, during the same round.
 				// It prevents farming, as silly as it is to need a system like this...
@@ -1285,8 +1306,15 @@ public CalculateDamageAward(client) {
 
 					DamageAward[i][client] = DamageAward[i][client] + RoundToCeil(DamageAward[i][client] * (HandicapLevel[i] * StringToFloat(GetConfigValue("handicap experience bonus?"))));
 				}
+				// Old Method:
 				SurvExp = RoundToFloor((experienceMultiplierSurvivor + teamworkExperienceMultiplier) * DamageAward[i][client]);
 				SurvPoints = ((pointsMultiplierSurvivor + teamworkPointsMultiplier) + (LivingHumanSurvivors() * StringToFloat(GetConfigValue("points multiplier survivor count?")))) * DamageAward[i][client];
+				//ll
+				/* New Method
+					Incorporates the base earnings into the mutliplier calculations in order to allow the returned value to be a minimum of any value, including 0.
+				*/
+				//SurvExp = RoundToFloor(teamworkExperienceMultiplier * DamageAward[i][client]);
+				//SurvPoints = (teamworkPointsMultiplier + (LivingHumanSurvivors() * StringToFloat(GetConfigValue("points multiplier survivor count?")))) * DamageAward[i][client];
 				if (IsIncapacitated(i)) {
 
 					SurvPoints *= StringToFloat(GetConfigValue("points multiplier survivor incapped?"));
@@ -1382,3 +1410,4 @@ public CalculateDamageAward(client) {
 // Points earned from hurting players used to unlock abilities, while experienced earned to increase level determines which abilities a player has access to.
 // This way, even if the level is different, everyone starts with the same footing.
 // Optional RPG System. Maybe call it "buy rpg mode?"
+
